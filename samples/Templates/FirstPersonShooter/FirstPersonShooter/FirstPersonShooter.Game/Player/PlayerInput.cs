@@ -23,6 +23,15 @@ namespace FirstPersonShooter.Player
 
         public static readonly EventKey<bool> ReloadEventKey = new EventKey<bool>();                    // This can be made non-static and require specific binding to the scripts instead
 
+        public static readonly EventKey SwitchCameraModeEventKey = new EventKey();               // Event for camera mode switch
+        public static readonly EventKey ShootReleasedEventKey = new EventKey();                  // Event for when shooting input is released (e.g., for bows)
+        public static readonly EventKey ToggleBuildModeEventKey = new EventKey();                // Event for toggling building mode
+        public static readonly EventKey RotateBuildActionLeftEventKey = new EventKey();          // Event for rotating build preview left
+        public static readonly EventKey RotateBuildActionRightEventKey = new EventKey();         // Event for rotating build preview right
+        public static readonly EventKey CycleBuildableNextEventKey = new EventKey();             // Event for cycling to next buildable item
+        public static readonly EventKey CycleBuildablePrevEventKey = new EventKey();             // Event for cycling to previous buildable item
+        public static readonly EventKey DebugDestroyEventKey = new EventKey();                   // Event for debug destroying a building piece
+
         public float DeadZone { get; set; } = 0.25f;
 
         public CameraComponent Camera { get; set; }
@@ -32,15 +41,27 @@ namespace FirstPersonShooter.Player
         /// </summary>
         public float MouseSensitivity { get; set; } = 100.0f;
 
-        public List<Keys> KeysLeft { get; } = new List<Keys>();
+        public List<Keys> KeysLeft { get; set; } = new List<Keys>() { Keys.A, Keys.Left };
 
-        public List<Keys> KeysRight { get; } = new List<Keys>();
+        public List<Keys> KeysRight { get; set; } = new List<Keys>() { Keys.D, Keys.Right };
 
-        public List<Keys> KeysUp { get; } = new List<Keys>();
+        public List<Keys> KeysUp { get; set; } = new List<Keys>() { Keys.W, Keys.Up };
 
-        public List<Keys> KeysDown { get; } = new List<Keys>();
+        public List<Keys> KeysDown { get; set; } = new List<Keys>() { Keys.S, Keys.Down };
 
-        public List<Keys> KeysReload { get; } = new List<Keys>();
+        public List<Keys> KeysReload { get; set; } = new List<Keys>() { Keys.R };
+
+        public List<Keys> KeysSwitchCamera { get; set; } = new List<Keys>() { Keys.T }; // Keys for switching camera
+        
+        public List<Keys> KeysToggleBuildMode { get; set; } = new List<Keys>() { Keys.B };
+        public List<Keys> KeysRotateBuildLeft { get; set; } = new List<Keys>() { Keys.OemComma }; // ',' or '<' key
+        public List<Keys> KeysRotateBuildRight { get; set; } = new List<Keys>() { Keys.OemPeriod }; // '.' or '>' key
+        
+        // Using Keys.PageUp and Keys.PageDown as example, can be changed. Mouse wheel handled separately.
+        public List<Keys> KeysCycleBuildableNext { get; set; } = new List<Keys>() { Keys.PageUp }; 
+        public List<Keys> KeysCycleBuildablePrev { get; set; } = new List<Keys>() { Keys.PageDown };
+        public List<Keys> KeysDebugDestroy { get; set; } = new List<Keys>() { Keys.K };
+
 
         public PlayerInput()
         {
@@ -130,6 +151,26 @@ namespace FirstPersonShooter.Player
                     didShoot = true;
 
                 ShootEventKey.Broadcast(didShoot);
+
+                // Check for shoot release
+                bool didShootRelease = false;
+                if (Input.HasMouse && Input.IsMouseButtonReleased(MouseButton.Left))
+                    didShootRelease = true;
+                
+                // Pointer events are not "released" in the same way as mouse buttons or keys.
+                // A common pattern for touch is to check for PointerEventType.Released.
+                // However, PointerEvents is a list of events that occurred *this frame*.
+                // For simplicity, matching game controller trigger release.
+                if (Input.IsTriggerReleasedAny(0.2f)) // Check if any trigger was released (using same threshold as GetRightTriggerAny)
+                    didShootRelease = true;
+                
+                // If other input types are used for "didShoot", their release should be checked here too.
+                // e.g. Tap events don't have a "release" in the same frame typically, they are discrete.
+
+                if (didShootRelease)
+                {
+                    ShootReleasedEventKey.Broadcast();
+                }
             }
 
             {
@@ -139,6 +180,59 @@ namespace FirstPersonShooter.Player
                     isReloading = true;
 
                 ReloadEventKey.Broadcast(isReloading);
+            }
+
+            // Camera mode switch
+            {
+                if (KeysSwitchCamera.Any(key => Input.IsKeyPressed(key)))
+                {
+                    SwitchCameraModeEventKey.Broadcast();
+                }
+            }
+
+            // Building mode toggle and rotation
+            {
+                if (KeysToggleBuildMode.Any(key => Input.IsKeyPressed(key)))
+                {
+                    ToggleBuildModeEventKey.Broadcast();
+                }
+                if (KeysRotateBuildLeft.Any(key => Input.IsKeyPressed(key)))
+                {
+                    RotateBuildActionLeftEventKey.Broadcast();
+                }
+                if (KeysRotateBuildRight.Any(key => Input.IsKeyPressed(key)))
+                {
+                    RotateBuildActionRightEventKey.Broadcast();
+                }
+                
+                // Cycle buildable items with mouse wheel
+                var mouseWheelDelta = Input.MouseWheelDelta;
+                if (mouseWheelDelta > 0) // Positive delta for scroll up/forward
+                {
+                    CycleBuildableNextEventKey.Broadcast();
+                }
+                else if (mouseWheelDelta < 0) // Negative delta for scroll down/backward
+                {
+                    CycleBuildablePrevEventKey.Broadcast();
+                }
+
+                // Cycle buildable items with keys
+                if (KeysCycleBuildableNext.Any(key => Input.IsKeyPressed(key)))
+                {
+                    CycleBuildableNextEventKey.Broadcast();
+                }
+                if (KeysCycleBuildablePrev.Any(key => Input.IsKeyPressed(key)))
+                {
+                    CycleBuildablePrevEventKey.Broadcast();
+                }
+            }
+            
+            // Debug Destroy
+            {
+                if (KeysDebugDestroy.Any(key => Input.IsKeyPressed(key)))
+                {
+                    DebugDestroyEventKey.Broadcast();
+                }
             }
         }
     }
