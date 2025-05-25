@@ -10,6 +10,8 @@ Meta:
 AssetFolders:
     -   Path: !dir ../Assets
     -   Path: !dir Effects
+    -   Path: !dir ../Assets
+    -   Path: !dir C:/Users/user/OneDrive/Documents/GitHub/striderr/samples/Templates/FirstPersonShooter/FirstPersonShooter/Assets
 ResourceFolders:
     - !dir ../Resources
 OutputGroupDirectories: {}
@@ -17,31 +19,3 @@ ExplicitFolders: []
 Bundles: []
 TemplateFolders: []
 RootAssets: []
-Assets:
-    -   Path: UI/Controls/ItemSlot.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
-    -   Path: UI/InventoryPanel.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
-    -   Path: UI/Controls/RecipeListItem.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
-    -   Path: UI/CraftingPanel.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
-    -   Path: UI/Controls/EngramNode.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
-    -   Path: UI/EngramPanel.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
-    -   Path: UI/MainGameUI.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
-    -   Path: UI/HUD/MinimapPanel.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
-    -   Path: UI/HUD/FullMapPanel.sdslui
-        Type: UIPageAsset
-        BuildOrder: 200
