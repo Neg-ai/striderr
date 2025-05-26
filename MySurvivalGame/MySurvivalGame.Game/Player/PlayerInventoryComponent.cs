@@ -2,9 +2,10 @@
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 // Adapted for MySurvivalGame.
 
+using System;
 using System.Collections.Generic;
-using System.Linq; // For FirstOrDefault
-using MySurvivalGame.Game.Items; // For MockInventoryItem
+using System.Linq;
+using MySurvivalGame.Data.Items; // For ItemData, ItemStack, ItemDatabase
 using Stride.Core; // For DataMemberIgnore attribute if needed by ScriptComponent
 using Stride.Engine;
 
@@ -12,140 +13,331 @@ namespace MySurvivalGame.Game.Player
 {
     public class PlayerInventoryComponent : ScriptComponent
     {
-        public List<MockInventoryItem> AllPlayerItems { get; private set; } = new List<MockInventoryItem>();
+        public List<ItemStack> InventorySlots { get; private set; }
+        public int MaxInventorySlots { get; private set; } = 20; // Default 5x4 grid
 
-        // This Start method is for testing purposes, to populate initial inventory
+        public event Action OnInventoryChanged;
+
         public override void Start()
         {
             base.Start();
-            if (AllPlayerItems.Count == 0) // Only add if inventory is empty
+            InitializeInventory();
+
+            // Example: Add some items for testing if the inventory is empty
+            if (InventorySlots.All(slot => slot == null))
             {
-                // Existing items
-                AddItem(new MockInventoryItem("Wood", "Resource", "A sturdy piece of wood.", null, 30, null, 64, EquipmentType.None));
-                AddItem(new MockInventoryItem("Stone", "Resource", "A common grey stone.", null, 90, null, 64, EquipmentType.None));
-                
-                // Updated Iron Axe to have SpecialBonusType.None
-                AddItem(new WeaponToolData("Iron Axe", "Tool", "A basic axe.", EquipmentType.Tool, 
-                                           damage: 15f, fireRate: 1.0f, range: 1.5f, maxDurability: 120f, 
-                                           bonusType: SpecialBonusType.None, // Explicitly set to None
-                                           initialDurability: 120f,
-                                           clipSize: 0, currentAmmoInClipPersisted: 0, reserveAmmoPersisted: 0)); // Non-ammo weapon
-
-                AddItem(new MockInventoryItem("Health Potion", "Consumable", "Restores health.", null, 5, null, 10, EquipmentType.Consumable));
-                
-                // Updated "Old Pistol" with ammo data
-                AddItem(new WeaponToolData("Old Pistol", "Weapon", "An old pistol.", EquipmentType.Weapon,
-                                           damage: 20f, fireRate: 2.0f, range: 25f, maxDurability: 80f,
-                                           bonusType: SpecialBonusType.Combat, 
-                                           clipSize: 7, 
-                                           currentAmmoInClipPersisted: 7, 
-                                           reserveAmmoPersisted: 21));
-
-                // New Test Tool Items
-                AddItem(new WeaponToolData("Logging Axe", "Tool", "An axe specialized for felling trees.", EquipmentType.Tool, 
-                                           damage: 12f, fireRate: 0.8f, range: 1.7f, maxDurability: 100f, 
-                                           bonusType: SpecialBonusType.Woodcutting, 
-                                           initialDurability: 100f,
-                                           clipSize: 0, currentAmmoInClipPersisted: 0, reserveAmmoPersisted: 0)); // Non-ammo weapon
-                                           
-                AddItem(new WeaponToolData("Stone Pickaxe", "Tool", "A pickaxe for mining stone and ore.", EquipmentType.Tool, 
-                                           damage: 10f, fireRate: 0.7f, range: 1.8f, maxDurability: 150f, 
-                                           bonusType: SpecialBonusType.Mining, 
-                                           initialDurability: 150f,
-                                           clipSize: 0, currentAmmoInClipPersisted: 0, reserveAmmoPersisted: 0)); // Non-ammo weapon
+                Log.Info("PlayerInventory: Initializing with test items.");
+                AddItem("wood", 15);
+                AddItem("stone", 60); // Should create one full stack and one partial
+                AddItem("stone_pickaxe", 1);
+                AddItem("health_potion_small", 3);
+                AddItem("arrow_basic", 25);
             }
         }
 
-        public bool AddItem(MockInventoryItem itemToAdd)
+        public void InitializeInventory(int? maxSlots = null)
         {
-            if (itemToAdd == null || itemToAdd.Quantity <= 0) return false;
-
-            // Attempt to stack with existing items
-            if (itemToAdd.IsStackable)
+            if (maxSlots.HasValue)
             {
-                foreach (var existingItem in AllPlayerItems)
-                {
-                    if (existingItem.Name == itemToAdd.Name && // Simple name check for stackability for now
-                        existingItem.IsStackable &&
-                        existingItem.Quantity < existingItem.MaxStackSize)
-                    {
-                        int canAdd = existingItem.MaxStackSize - existingItem.Quantity;
-                        int willAdd = System.Math.Min(itemToAdd.Quantity, canAdd);
+                MaxInventorySlots = maxSlots.Value;
+            }
 
-                        existingItem.Quantity += willAdd;
-                        itemToAdd.Quantity -= willAdd;
-                        Log.Info($"PlayerInventory: Stacked {willAdd} of {itemToAdd.Name}. Remaining to add: {itemToAdd.Quantity}");
-                        if (itemToAdd.Quantity <= 0) return true; // Fully stacked
+            InventorySlots = new List<ItemStack>(MaxInventorySlots);
+            for (int i = 0; i < MaxInventorySlots; i++)
+            {
+                InventorySlots.Add(null); // Initialize with empty slots
+            }
+            Log.Info($"PlayerInventory: Initialized with {MaxInventorySlots} slots.");
+            OnInventoryChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Adds a specified quantity of an item to the inventory.
+        /// </summary>
+        /// <param name="itemID">The ID of the item to add.</param>
+        /// <param name="quantity">The quantity to add.</param>
+        /// <returns>The quantity actually added (might be less than requested if inventory is full or item doesn't exist).</returns>
+        public int AddItem(string itemID, int quantity)
+        {
+            if (quantity <= 0) return 0;
+
+            ItemData itemData = ItemDatabase.GetItem(itemID);
+            if (itemData == null)
+            {
+                Log.Warning($"PlayerInventory: ItemID '{itemID}' not found in database.");
+                return 0;
+            }
+
+            int quantityRemainingToAdd = quantity;
+
+            // 1. Try to stack with existing items
+            for (int i = 0; i < MaxInventorySlots; i++)
+            {
+                if (InventorySlots[i] != null && InventorySlots[i].Item.ItemID == itemID)
+                {
+                    InventorySlots[i].CanAddItem(quantityRemainingToAdd, out int canAddToStack);
+                    if (canAddToStack > 0)
+                    {
+                        InventorySlots[i].AddQuantity(canAddToStack);
+                        quantityRemainingToAdd -= canAddToStack;
+                        Log.Info($"PlayerInventory: Stacked {canAddToStack} of {itemID} in slot {i}. Remaining to add: {quantityRemainingToAdd}");
+                        OnInventoryChanged?.Invoke();
+                        if (quantityRemainingToAdd <= 0) return quantity; // All items added
                     }
                 }
             }
 
-            // If item still has quantity, add as new stack or new item
-            if (itemToAdd.Quantity > 0)
+            // 2. Try to add to new empty slots
+            if (quantityRemainingToAdd > 0)
             {
-                // Optional: Check for inventory capacity if you have a max slot limit
-                // For now, just add.
-                // Create a new instance to avoid modifying the original itemToAdd if it's used elsewhere
-                var newItemInstance = new MockInventoryItem(
-                    itemToAdd.Name, 
-                    itemToAdd.ItemType, 
-                    itemToAdd.Description, 
-                    itemToAdd.Icon, 
-                    itemToAdd.Quantity, // This is the remaining quantity
-                    itemToAdd.Durability, 
-                    itemToAdd.MaxStackSize, 
-                    itemToAdd.CurrentEquipmentType
-                );
-                AllPlayerItems.Add(newItemInstance);
-                Log.Info($"PlayerInventory: Added new stack of {newItemInstance.Quantity} of {newItemInstance.Name}.");
+                for (int i = 0; i < MaxInventorySlots; i++)
+                {
+                    if (InventorySlots[i] == null)
+                    {
+                        int quantityForNewStack = System.Math.Min(quantityRemainingToAdd, itemData.MaxStackSize);
+                        InventorySlots[i] = new ItemStack(itemData, quantityForNewStack);
+                        // Durability is handled by ItemStack constructor
+                        quantityRemainingToAdd -= quantityForNewStack;
+                        Log.Info($"PlayerInventory: Added new stack of {quantityForNewStack} of {itemID} to slot {i}. Remaining to add: {quantityRemainingToAdd}");
+                        OnInventoryChanged?.Invoke();
+                        if (quantityRemainingToAdd <= 0) return quantity; // All items added
+                    }
+                }
+            }
+            
+            int quantityAdded = quantity - quantityRemainingToAdd;
+            if (quantityRemainingToAdd > 0)
+            {
+                Log.Warning($"PlayerInventory: Inventory full or unable to stack. Could not add {quantityRemainingToAdd} of {itemID}. Successfully added {quantityAdded}.");
+            }
+            return quantityAdded;
+        }
+
+        /// <summary>
+        /// Removes a specified quantity of an item from a given slot.
+        /// </summary>
+        /// <param name="slotIndex">The index of the inventory slot.</param>
+        /// <param name="quantity">The quantity to remove.</param>
+        /// <returns>True if the quantity was successfully removed, false otherwise.</returns>
+        public bool RemoveItem(int slotIndex, int quantity)
+        {
+            if (slotIndex < 0 || slotIndex >= MaxInventorySlots || InventorySlots[slotIndex] == null || quantity <= 0)
+            {
+                return false;
+            }
+
+            ItemStack stack = InventorySlots[slotIndex];
+            int removedAmount = stack.RemoveQuantity(quantity);
+
+            if (removedAmount > 0)
+            {
+                Log.Info($"PlayerInventory: Removed {removedAmount} of {stack.Item.ItemName} from slot {slotIndex}.");
+                if (stack.Quantity <= 0)
+                {
+                    InventorySlots[slotIndex] = null;
+                    Log.Info($"PlayerInventory: Slot {slotIndex} ({stack.Item.ItemName}) is now empty.");
+                }
+                OnInventoryChanged?.Invoke();
                 return true;
             }
-            // This return false would only be hit if itemToAdd.Quantity was initially > 0,
-            // then fully stacked, then itemToAdd.Quantity became 0, then somehow the code
-            // didn't return true inside the loop. This path should ideally not be hit
-            // if logic is correct. If it was not stackable or no stacking occurred,
-            // the second if (itemToAdd.Quantity > 0) handles it.
-            return false; 
+            return false;
         }
 
-        public void RemoveItem(MockInventoryItem itemToRemove)
+        /// <summary>
+        /// Consumes a specified quantity of an item by its name.
+        /// Prefers ItemID for robustness, but uses ItemName as per original spec.
+        /// </summary>
+        /// <param name="itemName">The name of the item to consume.</param>
+        /// <param name="quantity">The quantity to consume.</param>
+        /// <returns>True if consumption was successful, false otherwise.</returns>
+        public bool ConsumeItemByName(string itemName, int quantity)
         {
-            if (itemToRemove == null) return;
-            // For non-stackable items or removing a whole stack by instance
-            var itemInstance = AllPlayerItems.FirstOrDefault(i => i.UniqueId == itemToRemove.UniqueId);
-            if (itemInstance != null) 
+            if (string.IsNullOrEmpty(itemName) || quantity <= 0) return false;
+
+            int quantityRemainingToConsume = quantity;
+
+            for (int i = 0; i < MaxInventorySlots; i++)
             {
-                bool removed = AllPlayerItems.Remove(itemInstance);
-                if(removed) Log.Info($"PlayerInventory: Removed item {itemToRemove.Name} (ID: {itemToRemove.UniqueId}).");
+                if (InventorySlots[i] != null && InventorySlots[i].Item.ItemName == itemName)
+                {
+                    int canConsumeFromStack = Math.Min(quantityRemainingToConsume, InventorySlots[i].Quantity);
+                    if (RemoveItem(i, canConsumeFromStack)) // RemoveItem handles OnInventoryChanged
+                    {
+                        quantityRemainingToConsume -= canConsumeFromStack;
+                        Log.Info($"PlayerInventory: Consumed {canConsumeFromStack} of {itemName} from slot {i}. Remaining to consume: {quantityRemainingToConsume}.");
+                        if (quantityRemainingToConsume <= 0) return true;
+                    }
+                }
+            }
+
+            if (quantityRemainingToConsume > 0)
+            {
+                Log.Warning($"PlayerInventory: Could not consume the full quantity of {quantity} for item {itemName}. {quantityRemainingToConsume} remaining.");
+                return false; // Partial consumption might still have occurred if some items were removed.
+            }
+            return true; // Should be reached if quantityRemainingToConsume is 0.
+        }
+
+
+        public ItemStack GetItemStack(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= MaxInventorySlots)
+            {
+                return null;
+            }
+            return InventorySlots[slotIndex];
+        }
+
+        /// <summary>
+        /// Finds the first slot index containing the specified itemID.
+        /// </summary>
+        /// <param name="itemID">The ItemID to search for.</param>
+        /// <returns>The index of the first slot, or -1 if not found.</returns>
+        public int FindItemSlot(string itemID)
+        {
+            for (int i = 0; i < MaxInventorySlots; i++)
+            {
+                if (InventorySlots[i] != null && InventorySlots[i].Item.ItemID == itemID)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Finds all slot indices containing the specified itemID.
+        /// </summary>
+        public List<int> FindAllItemSlots(string itemID)
+        {
+            List<int> foundSlots = new List<int>();
+            for (int i = 0; i < MaxInventorySlots; i++)
+            {
+                if (InventorySlots[i] != null && InventorySlots[i].Item.ItemID == itemID)
+                {
+                    foundSlots.Add(i);
+                }
+            }
+            return foundSlots;
+        }
+
+        /// <summary>
+        /// Placeholder for decreasing durability. Actual logic would be more complex.
+        /// </summary>
+        public void DecreaseDurability(int slotIndex, float amount)
+        {
+            if (slotIndex < 0 || slotIndex >= MaxInventorySlots || InventorySlots[slotIndex] == null) return;
+
+            ItemStack stack = InventorySlots[slotIndex];
+            if (stack.Item.Type == ItemType.Tool || stack.Item.Type == ItemType.Weapon)
+            {
+                stack.CurrentDurability -= amount;
+                if (stack.CurrentDurability < 0) stack.CurrentDurability = 0;
+                Log.Info($"PlayerInventory: Durability of {stack.Item.ItemName} in slot {slotIndex} decreased to {stack.CurrentDurability}.");
+                OnInventoryChanged?.Invoke(); // Durability change might affect UI
+
+                // Optionally, handle item breaking
+                if (stack.CurrentDurability == 0)
+                {
+                    Log.Info($"PlayerInventory: {stack.Item.ItemName} in slot {slotIndex} broke!");
+                    // Potentially remove or mark as broken. For now, just logs.
+                    // RemoveItem(slotIndex, 1); // If breaking removes the item
+                }
             }
         }
 
-        public bool TryConsumeQuantity(System.Guid itemId, int quantityToConsume)
+        /// <summary>
+        /// Swaps the ItemStacks in two given slot indices.
+        /// </summary>
+        /// <param name="indexA">The first slot index.</param>
+        /// <param name="indexB">The second slot index.</param>
+        /// <returns>True if swapping was successful, false otherwise (e.g., out of bounds).</returns>
+        public bool SwapSlots(int indexA, int indexB)
         {
-            var itemInstance = AllPlayerItems.FirstOrDefault(i => i.UniqueId == itemId);
-            if (itemInstance != null)
+            if (indexA < 0 || indexA >= MaxInventorySlots || indexB < 0 || indexB >= MaxInventorySlots)
             {
-                if (itemInstance.Quantity >= quantityToConsume)
-                {
-                    itemInstance.Quantity -= quantityToConsume;
-                    Log.Info($"PlayerInventory: Consumed {quantityToConsume} of {itemInstance.Name}. Remaining: {itemInstance.Quantity}.");
-                    if (itemInstance.Quantity <= 0)
-                    {
-                        AllPlayerItems.Remove(itemInstance);
-                        Log.Info($"PlayerInventory: Removed empty stack of {itemInstance.Name} after consumption.");
-                    }
-                    return true;
-                }
-                else
-                {
-                    Log.Warning($"PlayerInventory: Not enough quantity to consume {quantityToConsume} of {itemInstance.Name}. Has: {itemInstance.Quantity}.");
-                }
+                Log.Warning($"PlayerInventory: SwapSlots - Index out of bounds. A: {indexA}, B: {indexB}");
+                return false;
+            }
+
+            if (indexA == indexB) return true; // Nothing to swap
+
+            Log.Info($"PlayerInventory: Swapping slot {indexA} ('{InventorySlots[indexA]?.Item?.ItemName ?? "Empty"}') with slot {indexB} ('{InventorySlots[indexB]?.Item?.ItemName ?? "Empty"}').");
+            
+            ItemStack temp = InventorySlots[indexA];
+            InventorySlots[indexA] = InventorySlots[indexB];
+            InventorySlots[indexB] = temp;
+
+            OnInventoryChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>
+        /// Clears a specific slot in the inventory, setting it to null.
+        /// </summary>
+        /// <param name="slotIndex">The index of the slot to clear.</param>
+        public void ClearSlot(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= MaxInventorySlots)
+            {
+                Log.Warning($"PlayerInventory: ClearSlot - Index out of bounds: {slotIndex}");
+                return;
+            }
+
+            if (InventorySlots[slotIndex] != null)
+            {
+                Log.Info($"PlayerInventory: Clearing slot {slotIndex} (was '{InventorySlots[slotIndex].Item.ItemName}').");
+                InventorySlots[slotIndex] = null;
+                OnInventoryChanged?.Invoke();
+            }
+        }
+
+        /// <summary>
+        /// Consumes a specified quantity of an item directly from a slot index.
+        /// Checks if the item is a consumable.
+        /// </summary>
+        /// <param name="slotIndex">The index of the slot to consume from.</param>
+        /// <param name="quantity">The quantity to consume.</param>
+        /// <returns>True if consumption was successful, false otherwise.</returns>
+        public bool ConsumeItemBySlot(int slotIndex, int quantity)
+        {
+            if (slotIndex < 0 || slotIndex >= MaxInventorySlots || quantity <= 0)
+            {
+                Log.Warning($"PlayerInventory: ConsumeItemBySlot - Invalid parameters. Slot: {slotIndex}, Quantity: {quantity}");
+                return false;
+            }
+
+            ItemStack stack = GetItemStack(slotIndex);
+            if (stack == null)
+            {
+                Log.Warning($"PlayerInventory: ConsumeItemBySlot - No item in slot {slotIndex}.");
+                return false;
+            }
+
+            if (stack.Item.Type != ItemType.Consumable)
+            {
+                Log.Warning($"PlayerInventory: ConsumeItemBySlot - Item '{stack.Item.ItemName}' in slot {slotIndex} is not a consumable.");
+                return false;
+            }
+
+            if (stack.Quantity < quantity)
+            {
+                Log.Warning($"PlayerInventory: ConsumeItemBySlot - Not enough quantity of '{stack.Item.ItemName}' in slot {slotIndex}. Has: {stack.Quantity}, Need: {quantity}.");
+                return false;
+            }
+
+            // Actual consumption logic (remove from stack)
+            bool removed = RemoveItem(slotIndex, quantity);
+            if (removed)
+            {
+                Log.Info($"PlayerInventory: Consumed {quantity} of '{stack.Item.ItemName}' from slot {slotIndex}.");
+                // OnInventoryChanged is called by RemoveItem
             }
             else
             {
-                 Log.Warning($"PlayerInventory: Item with ID {itemId} not found for consumption.");
+                Log.Error($"PlayerInventory: ConsumeItemBySlot - Failed to remove item '{stack.Item.ItemName}' from slot {slotIndex} despite checks.");
             }
-            return false;
+            return removed;
         }
     }
 }

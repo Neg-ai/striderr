@@ -21,9 +21,9 @@ namespace MySurvivalGame.Game
         public static readonly EventKey<int> HotbarSlotSelectedEventKey = new EventKey<int>(); // ADDED: For hotbar selection
         public static readonly EventKey InteractEventKey = new EventKey(); // ADDED: For interaction
 
-        // public static readonly EventKey<bool> ShootEventKey = new EventKey<bool>();
-        // public static readonly EventKey<bool> ReloadEventKey = new EventKey<bool>();
-        // public static readonly EventKey ShootReleasedEventKey = new EventKey();
+        public static readonly EventKey<bool> ShootEventKey = new EventKey<bool>();
+        public static readonly EventKey<bool> ReloadEventKey = new EventKey<bool>();
+        public static readonly EventKey ShootReleasedEventKey = new EventKey();
         // public static readonly EventKey ToggleBuildModeEventKey = new EventKey();
         // public static readonly EventKey RotateBuildActionLeftEventKey = new EventKey();
         // public static readonly EventKey RotateBuildActionRightEventKey = new EventKey();
@@ -48,7 +48,7 @@ namespace MySurvivalGame.Game
         public List<Keys> KeysRight { get; set; } = new List<Keys>() { Keys.D, Keys.Right }; // MODIFIED: Uncommented
         public List<Keys> KeysUp { get; set; } = new List<Keys>() { Keys.W, Keys.Up }; // MODIFIED: Uncommented
         public List<Keys> KeysDown { get; set; } = new List<Keys>() { Keys.S, Keys.Down }; // MODIFIED: Uncommented
-        // public List<Keys> KeysReload { get; set; } = new List<Keys>() { Keys.R };
+        public List<Keys> KeysReload { get; set; } = new List<Keys>() { Keys.R };
         public List<Keys> KeysSwitchCamera { get; set; } = new List<Keys>() { Keys.T }; // MODIFIED: Uncommented
         // public List<Keys> KeysToggleBuildMode { get; set; } = new List<Keys>() { Keys.B };
         // public List<Keys> KeysRotateBuildLeft { get; set; } = new List<Keys>() { Keys.OemComma };
@@ -131,23 +131,33 @@ namespace MySurvivalGame.Game
                 CameraDirectionEventKey.Broadcast(cameraDirection);
             }
 
-            // Shooting logic commented out
-            /*
+            // Shooting logic
             {
-                // ... (shooting logic) ...
-                ShootEventKey.Broadcast(didShoot);
-                // ... (shoot release logic) ...
-                ShootReleasedEventKey.Broadcast();
-            }
-            */
+                // Broadcast the current state of the shoot button (e.g., left mouse button).
+                // This is useful for automatic weapons or charging mechanics.
+                bool isShooting = Input.IsMouseButtonDown(MouseButton.Left);
+                ShootEventKey.Broadcast(isShooting);
 
-            // Reload logic commented out
-            /*
-            {
-                // ... (reload logic) ...
-                ReloadEventKey.Broadcast(isReloading);
+                // Broadcast an event when the shoot button is released.
+                // Useful for single-shot actions or releasing a charged shot.
+                if (Input.IsMouseButtonReleased(MouseButton.Left))
+                {
+                    ShootReleasedEventKey.Broadcast();
+                }
             }
-            */
+
+            // Reload logic
+            {
+                bool isReloading = KeysReload.Any(key => Input.IsKeyPressed(key));
+                if (isReloading) // Only broadcast if a reload key was pressed this frame
+                {
+                    ReloadEventKey.Broadcast(true);
+                    // Note: PlayerEquipment might only care about the initial press (true).
+                    // If it needs a continuous false signal when not reloading,
+                    // this broadcast would need to be outside the 'if' and send 'false' accordingly.
+                    // For now, we assume only the press (true) is relevant.
+                }
+            }
 
             // Camera mode switch logic
             {

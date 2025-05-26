@@ -1,91 +1,159 @@
 using Stride.Engine;
 using Stride.Core.Mathematics;
-using MySurvivalGame.Game.Player;       // For PlayerInventoryComponent
-using MySurvivalGame.Game.Items;        // For WeaponToolData
+using MySurvivalGame.Game.Player;       // For PlayerInventoryComponent, PlayerInput
+using MySurvivalGame.Data.Items;        // MODIFIED: For ItemData
 using MySurvivalGame.Game.Core;         // For DamageType
 using MySurvivalGame.Game.Audio;        // For GameSoundManager
 
 namespace MySurvivalGame.Game.Weapons.Ranged
 {
-    public class WoodenBow : BaseBowWeapon
+    public class WoodenBow : BaseBowWeapon // BaseBowWeapon inherits from BaseWeapon
     {
-        // WeaponToolData (from PlayerEquipment.currentlyEquippedItemData, cast to WeaponToolData) will hold stats like Damage, Range, RequiredAmmoName
-        public WeaponToolData BowData { get; private set; }
+        private int currentAmmoInInventory = 0;
+        private PlayerInventoryComponent playerInventory;
 
-
-        public override void OnEquip(Entity owner)
+        public override void OnEquip(Entity owner) // owner is the player entity
         {
-            base.OnEquip(owner); // Call base if it has logic
-            var playerEquipment = owner?.Get<PlayerEquipment>();
-            if (playerEquipment != null && playerEquipment.currentlyEquippedItemData is WeaponToolData wtd)
+            base.OnEquip(owner); 
+            playerInventory = owner?.Get<PlayerInventoryComponent>();
+
+            if (ConfiguredItemData?.WeaponData != null)
             {
-                this.BowData = wtd;
-                Log.Info($"{Entity.Name}: Wooden Bow equipped. Ammo type: {this.BowData.RequiredAmmoName}");
+                UpdateAmmoCountFromInventory(owner);
+                Log.Info($"{ConfiguredItemData.ItemName}: Equipped. Required Ammo ID: '{ConfiguredItemData.WeaponData.RequiredAmmoItemID}'. Found in Inv: {currentAmmoInInventory}");
+            }
+            else
+            {
+                Log.Warning($"{this.Entity?.Name ?? "WoodenBow"}: Equipped, but ConfiguredItemData.WeaponData is null. Ammo functionality will be impaired.");
+                currentAmmoInInventory = 0;
             }
         }
-        
-        protected override void ReleaseArrow(float chargeTime)
+
+        public override void OnUnequip(Entity owner)
         {
-            if (BowData == null)
+            base.OnUnequip(owner);
+            playerInventory = null;
+            Log.Info($"{ConfiguredItemData?.ItemName ?? this.Entity?.Name ?? "WoodenBow"}: Unequipped.");
+        }
+        
+        protected override void ReleaseArrow(float chargeTime) // This method is called by BaseBowWeapon's PrimaryActionReleased
+        {
+            var itemName = ConfiguredItemData?.ItemName ?? this.Entity?.Name ?? "WoodenBow";
+            if (ConfiguredItemData?.WeaponData == null)
             {
-                Log.Error("WoodenBow: BowData not set. Cannot fire.");
+                Log.Error($"{itemName}: WeaponData not configured. Cannot fire.");
                 return;
             }
-
-            var playerEntity = this.Entity?.GetParent(); // Or however player entity is found
-            var playerInventory = playerEntity?.Get<PlayerInventoryComponent>();
 
             if (playerInventory == null)
             {
-                Log.Error("WoodenBow: PlayerInventoryComponent not found.");
+                Log.Error($"{itemName}: PlayerInventoryComponent not found. Cannot check/consume ammo.");
                 return;
             }
+            
+            UpdateAmmoCountFromInventory(this.Entity.GetParent()); // Refresh ammo count before trying to consume
 
-            if (playerInventory.ConsumeItemByName(BowData.RequiredAmmoName, 1))
+            string requiredAmmoId = ConfiguredItemData.WeaponData.RequiredAmmoItemID;
+            if (string.IsNullOrEmpty(requiredAmmoId))
             {
-                Log.Info($"{Entity.Name}: Arrow fired with charge {chargeTime:F2}s. (Conceptual Raycast)");
+                 Log.Warning($"{itemName}: No RequiredAmmoItemID specified in WeaponData.");
+                 // Optionally, allow firing a default "no-ammo" arrow or prevent firing.
+                 // For now, let's prevent firing if ammo ID is not set.
+                 return;
+            }
+
+            if (ConsumeArrowFromInventory(requiredAmmoId))
+            {
+                Log.Info($"{itemName}: Arrow fired with charge {chargeTime:F2}s.");
                 GameSoundManager.PlaySound("Bow_Shoot", Entity.Transform.WorldMatrix.TranslationVector);
 
-                var camera = GetCamera(); // Assumes GetCamera() helper exists as in Pistol.cs
+                var camera = GetCamera();
                 if (camera != null)
                 {
                     Matrix cameraWorldMatrix = camera.Entity.Transform.WorldMatrix;
                     Vector3 raycastStart = cameraWorldMatrix.TranslationVector;
                     Vector3 raycastDirection = cameraWorldMatrix.Forward;
-                    // Range and Damage could be affected by chargeTime in a more complex system
-                    float range = BowData.Range; 
-                    float damage = BowData.Damage;
+                    
+                    // Stats from ConfiguredItemData
+                    float range = ConfiguredItemData.WeaponData.Range; 
+                    float damage = ConfiguredItemData.WeaponData.Damage * CalculateChargeBonus(chargeTime); // Example charge bonus
 
                     var simulation = this.GetSimulation();
                     var hitResult = simulation.Raycast(raycastStart, raycastStart + raycastDirection * range);
                     if (hitResult.Succeeded && hitResult.Collider?.Entity.Get<IDamageable>() != null)
                     {
-                        Log.Info($"WoodenBow: Hit {hitResult.Collider.Entity.Name}. Applying {damage} damage.");
+                        Log.Info($"{itemName}: Hit {hitResult.Collider.Entity.Name}. Applying {damage} damage.");
                         hitResult.Collider.Entity.Get<IDamageable>().TakeDamage(damage, DamageType.Ranged);
                     } else if (hitResult.Succeeded) {
-                        Log.Info($"WoodenBow: Hit {hitResult.Collider.Entity.Name}, but it's not Damageable.");
+                        Log.Info($"{itemName}: Hit {hitResult.Collider.Entity.Name}, but it's not Damageable.");
                     } else {
-                        Log.Info($"WoodenBow: Arrow missed.");
+                        Log.Info($"{itemName}: Arrow missed.");
                     }
                 }
+                UpdateAmmoCountFromInventory(this.Entity.GetParent()); // Update count after firing
             }
             else
             {
-                Log.Info($"{Entity.Name}: No '{BowData.RequiredAmmoName}' in inventory!");
+                Log.Info($"{itemName}: No '{requiredAmmoId}' in inventory!");
                 GameSoundManager.PlaySound("Bow_Empty", Entity.Transform.WorldMatrix.TranslationVector);
             }
         }
 
-        // Helper to get camera, similar to Pistol.cs
-        private CameraComponent GetCamera()
+        private float CalculateChargeBonus(float chargeTime)
         {
-            var playerScriptOwner = this.Entity?.Get<PlayerEquipment>() != null ? this.Entity : this.Entity?.GetParent();
-            return playerScriptOwner?.Get<PlayerInput>()?.Camera;
+            // Example: Simple charge bonus, max 2x damage at 1s charge
+            return 1.0f + MathUtil.Clamp(chargeTime, 0, 1.0f);
         }
 
-        // SecondaryAction for bows could be nocking a different arrow type, or aiming down sights if applicable
-        public override void SecondaryAction() { Log.Info($"{Entity.Name}: Wooden Bow Secondary Action (e.g. Aim TBD)."); }
-        public override void Reload() { Log.Info($"{Entity.Name}: Wooden Bow does not reload in the traditional sense."); }
+        private void UpdateAmmoCountFromInventory(Entity ownerEntity)
+        {
+            if (playerInventory == null || ConfiguredItemData?.WeaponData?.RequiredAmmoItemID == null)
+            {
+                currentAmmoInInventory = 0;
+                return;
+            }
 
+            int count = 0;
+            var slots = playerInventory.FindAllItemSlots(ConfiguredItemData.WeaponData.RequiredAmmoItemID);
+            foreach (var slotIndex in slots)
+            {
+                var itemStack = playerInventory.GetItemStack(slotIndex);
+                if (itemStack != null)
+                {
+                    count += itemStack.Quantity;
+                }
+            }
+            currentAmmoInInventory = count;
+        }
+
+        private bool ConsumeArrowFromInventory(string ammoItemId)
+        {
+            if (playerInventory == null) return false;
+
+            var ammoSlots = playerInventory.FindAllItemSlots(ammoItemId);
+            if (ammoSlots.Count > 0)
+            {
+                // Consume one arrow from the first available stack
+                if (playerInventory.RemoveItem(ammoSlots[0], 1))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private CameraComponent GetCamera()
+        {
+            // Assumes this script is on a weapon entity child of the player entity
+            var playerEntity = this.Entity?.GetParent(); 
+            return playerEntity?.Get<PlayerInput>()?.Camera;
+        }
+        
+        // BaseBowWeapon handles PrimaryAction to start charging, and OnPrimaryActionReleased to call ReleaseArrow.
+        // So, PrimaryAction in WoodenBow itself might not be needed if charge mechanic is in BaseBowWeapon.
+        // public override void PrimaryAction() { /* Potentially start drawing the bow */ }
+
+        public override void SecondaryAction() { Log.Info($"{ConfiguredItemData?.ItemName ?? Entity.Name}: Secondary Action (e.g. Aim TBD)."); }
+        public override void Reload() { Log.Info($"{ConfiguredItemData?.ItemName ?? Entity.Name}: Does not reload traditionally. Ammo count: {currentAmmoInInventory}"); }
     }
 }

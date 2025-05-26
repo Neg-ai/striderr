@@ -1,106 +1,187 @@
 using Stride.Engine;
 using Stride.Core.Mathematics; // For Matrix, Vector3 for camera access
 using MySurvivalGame.Game.Player; 
-using MySurvivalGame.Game.Items;  
+using MySurvivalGame.Data.Items;  // MODIFIED: For ItemData
 using MySurvivalGame.Game.Audio; // ADDED for GameSoundManager
 
 namespace MySurvivalGame.Game.Weapons.Ranged
 {
     public class Pistol : BaseRangedWeapon
     {
-        // WeaponToolData will hold the authoritative stats from inventory.
-        // These can be initialized when the weapon script is equipped.
-        public override int ClipSize { get; protected set; } = 7;
-        public int ActualCurrentAmmoInClip { get; set; } // This will be managed by the script instance
-        public int ActualReserveAmmo { get; set; }     // This will be managed by the script instance
+        public override int ClipSize { get; protected set; } // Now set from ConfiguredItemData
+        public int ActualCurrentAmmoInClip { get; protected set; }
+        public int ActualReserveAmmo { get; protected set; }
 
+        private PlayerInventoryComponent playerInventory; // Cache player inventory
 
         public override void PrimaryAction()
         {
+            var itemName = ConfiguredItemData?.ItemName ?? this.Entity?.Name ?? "Pistol";
             if (ActualCurrentAmmoInClip > 0)
             {
                 ActualCurrentAmmoInClip--;
-                Log.Info($"{this.Entity.Name}: Pistol Fired. Ammo: {ActualCurrentAmmoInClip}/{ClipSize}. Reserve: {ActualReserveAmmo}");
+                Log.Info($"{itemName}: Fired. Ammo: {ActualCurrentAmmoInClip}/{ClipSize}. Reserve: {ActualReserveAmmo}");
                 
-                // Get camera for raycast origin and direction
-                var camera = GetCamera(); // Helper method to get camera
-                if (camera != null)
+                var camera = GetCamera();
+                if (camera != null && ConfiguredItemData?.WeaponData != null)
                 {
                     Matrix cameraWorldMatrix = camera.Entity.Transform.WorldMatrix;
                     Vector3 raycastStart = cameraWorldMatrix.TranslationVector;
                     Vector3 raycastDirection = cameraWorldMatrix.Forward;
-                    float range = (this.Entity.Get<PlayerEquipment>()?.currentlyEquippedItemData as WeaponToolData)?.Range ?? 25f; // Get range from data or default
+                    float range = ConfiguredItemData.WeaponData.Range; 
                     
-                    ShootRaycast(raycastStart, raycastDirection, range);
+                    ShootRaycast(raycastStart, raycastDirection, range); // Assuming ShootRaycast uses ConfiguredItemData.WeaponData.Damage
                 }
                 GameSoundManager.PlaySound("Pistol_Shoot", this.Entity.Transform.WorldMatrix.TranslationVector);
-                // Future: muzzle flash
             }
             else
             {
-                Log.Info($"{this.Entity.Name}: Pistol click (empty).");
+                Log.Info($"{itemName}: Click (empty).");
                 GameSoundManager.PlaySound("Pistol_EmptyClick", this.Entity.Transform.WorldMatrix.TranslationVector);
             }
         }
 
         public override void Reload()
         {
+            var itemName = ConfiguredItemData?.ItemName ?? this.Entity?.Name ?? "Pistol";
             if (ActualCurrentAmmoInClip >= ClipSize)
             {
-                Log.Info($"{this.Entity.Name}: Pistol clip already full.");
+                Log.Info($"{itemName}: Clip already full.");
                 return;
             }
 
-            if (ActualReserveAmmo > 0)
+            if (ConfiguredItemData?.WeaponData?.RequiredAmmoItemID == null)
             {
-                int ammoToReload = ClipSize - ActualCurrentAmmoInClip;
-                int ammoToTakeFromReserve = System.Math.Min(ammoToReload, ActualReserveAmmo);
+                Log.Warning($"{itemName}: RequiredAmmoItemID not defined in ConfiguredItemData.WeaponData. Cannot reload.");
+                return;
+            }
+            
+            UpdateReserveAmmoFromInventory(this.Entity.GetParent()); // Ensure reserve ammo count is current
 
-                ActualCurrentAmmoInClip += ammoToTakeFromReserve;
-                ActualReserveAmmo -= ammoToTakeFromReserve;
-                Log.Info($"{this.Entity.Name}: Pistol Reloaded. Ammo: {ActualCurrentAmmoInClip}/{ClipSize}. Reserve: {ActualReserveAmmo}");
-                GameSoundManager.PlaySound("Pistol_Reload", this.Entity.Transform.WorldMatrix.TranslationVector);
-                // Future: Play animation
+            int ammoNeeded = ClipSize - ActualCurrentAmmoInClip;
+            int ammoToConsume = System.Math.Min(ammoNeeded, ActualReserveAmmo);
+
+            if (ammoToConsume > 0)
+            {
+                if (ConsumeAmmoFromInventory(this.Entity.GetParent(), ammoToConsume))
+                {
+                    ActualCurrentAmmoInClip += ammoToConsume;
+                    // ActualReserveAmmo is updated by ConsumeAmmoFromInventory indirectly via UpdateReserveAmmoFromInventory
+                    UpdateReserveAmmoFromInventory(this.Entity.GetParent()); // Re-fetch to confirm
+                    Log.Info($"{itemName}: Reloaded. Ammo: {ActualCurrentAmmoInClip}/{ClipSize}. Reserve: {ActualReserveAmmo}");
+                    GameSoundManager.PlaySound("Pistol_Reload", this.Entity.Transform.WorldMatrix.TranslationVector);
+                }
+                else
+                {
+                    Log.Info($"{itemName}: Failed to consume ammo from inventory for reload.");
+                }
             }
             else
             {
-                Log.Info($"{this.Entity.Name}: Pistol - No reserve ammo to reload.");
+                Log.Info($"{itemName}: No reserve ammo to reload ({ActualReserveAmmo} available).");
             }
         }
         
-        public override void OnEquip(Entity owner)
+        public override void OnEquip(Entity owner) // owner is the player entity
         {
-            Log.Info($"{this.Entity.Name}: Pistol equipped by {owner?.Name}.");
-            // Future: Initialize ActualCurrentAmmoInClip and ActualReserveAmmo from WeaponToolData.
-            // For example, if WeaponToolData stores these directly or has fields to map.
-            // This will be handled in the PlayerEquipment.EquipItem step more explicitly.
-            var playerEquipment = owner?.Get<PlayerEquipment>(); // Correctly get PlayerEquipment from owner
-            if(playerEquipment?.currentlyEquippedItemData is WeaponToolData weaponData) // Check if it's WeaponToolData
+            base.OnEquip(owner); // Call base to ensure logging or other base logic
+            playerInventory = owner?.Get<PlayerInventoryComponent>();
+
+            if (ConfiguredItemData?.WeaponData != null)
             {
-                // Example: this.ClipSize = weaponData.ClipSize; // If data-driven
-                ActualCurrentAmmoInClip = ClipSize; 
-                ActualReserveAmmo = 50; // Default placeholder
+                ClipSize = ConfiguredItemData.WeaponData.ClipSize > 0 ? ConfiguredItemData.WeaponData.ClipSize : 7; // Default to 7 if not set
+                ActualCurrentAmmoInClip = ClipSize; // Start with a full clip
+                UpdateReserveAmmoFromInventory(owner);
+                Log.Info($"{ConfiguredItemData.ItemName}: Equipped. Clip: {ActualCurrentAmmoInClip}/{ClipSize}. Reserve: {ActualReserveAmmo}");
+            }
+            else
+            {
+                ClipSize = 7; // Default
+                ActualCurrentAmmoInClip = ClipSize;
+                ActualReserveAmmo = 0;
+                Log.Warning($"{this.Entity?.Name ?? "Pistol"}: Equipped, but ConfiguredItemData.WeaponData is null. Using default clip size. Ammo may not function correctly.");
             }
         }
 
         public override void OnUnequip(Entity owner)
         {
-            Log.Info($"{this.Entity.Name}: Pistol unequipped by {owner?.Name}.");
-            // Future: Potentially save current ammo state back to WeaponToolData if it's instance specific.
+            base.OnUnequip(owner); // Call base to ensure logging or other base logic
+            Log.Info($"{ConfiguredItemData?.ItemName ?? this.Entity?.Name ?? "Pistol"}: Unequipped.");
+            playerInventory = null; 
+            // State (ActualCurrentAmmoInClip, ActualReserveAmmo) is lost when unequipped.
+            // To persist this, it would need to be saved back to an inventory system that can hold instance-specific data,
+            // or the weapon entity itself would need to be persisted/pooled instead of recreated.
+        }
+
+        private void UpdateReserveAmmoFromInventory(Entity ownerEntity)
+        {
+            if (playerInventory == null || ConfiguredItemData?.WeaponData?.RequiredAmmoItemID == null)
+            {
+                ActualReserveAmmo = 0;
+                return;
+            }
+
+            int count = 0;
+            var slots = playerInventory.FindAllItemSlots(ConfiguredItemData.WeaponData.RequiredAmmoItemID);
+            foreach (var slotIndex in slots)
+            {
+                var itemStack = playerInventory.GetItemStack(slotIndex);
+                if (itemStack != null)
+                {
+                    count += itemStack.Quantity;
+                }
+            }
+            ActualReserveAmmo = count;
+            // Log.Info($"{ConfiguredItemData.ItemName}: Reserve ammo updated to {ActualReserveAmmo}");
+        }
+
+        private bool ConsumeAmmoFromInventory(Entity ownerEntity, int amountToConsume)
+        {
+            if (playerInventory == null || ConfiguredItemData?.WeaponData?.RequiredAmmoItemID == null || amountToConsume <= 0)
+            {
+                return false;
+            }
+
+            string ammoItemID = ConfiguredItemData.WeaponData.RequiredAmmoItemID;
+            int remainingToConsume = amountToConsume;
+
+            var ammoSlots = playerInventory.FindAllItemSlots(ammoItemID);
+            if (ammoSlots.Count == 0) return false;
+
+            // Sort slots to consume from earliest first (optional, but can be consistent)
+            // ammoSlots.Sort(); 
+
+            foreach (var slotIndex in ammoSlots)
+            {
+                ItemStack ammoStack = playerInventory.GetItemStack(slotIndex);
+                if (ammoStack != null && ammoStack.Quantity > 0)
+                {
+                    int canConsumeFromThisStack = System.Math.Min(remainingToConsume, ammoStack.Quantity);
+                    if (playerInventory.RemoveItem(slotIndex, canConsumeFromThisStack))
+                    {
+                        remainingToConsume -= canConsumeFromThisStack;
+                        if (remainingToConsume <= 0) break;
+                    }
+                }
+            }
+            
+            bool success = remainingToConsume <= 0;
+            if(success)
+            {
+                 Log.Info($"{ConfiguredItemData.ItemName}: Consumed {amountToConsume} of {ammoItemID}.");
+            }
+            else
+            {
+                 Log.Warning($"{ConfiguredItemData.ItemName}: Could not consume {amountToConsume} of {ammoItemID}. Only {amountToConsume - remainingToConsume} consumed.");
+            }
+            UpdateReserveAmmoFromInventory(ownerEntity); // Refresh reserve count
+            return success;
         }
 
         private CameraComponent GetCamera()
         {
-            // Assuming PlayerEquipment is on Player, and PlayerInput is also on Player and has Camera linked.
-            var playerEntity = this.Entity?.GetParent(); // If weapon is child of PlayerEquipment entity. Or just Entity if weapon script is on Player.
-                                                        // This needs to be robust based on where PlayerEquipment puts weapon entities.
-                                                        // For now, assume PlayerEquipment is on Player, and PlayerInput is also on Player.
-            if (this.Entity?.Get<PlayerEquipment>() != null) // If this script is on the same entity as PlayerEquipment
-            {
-               return this.Entity.Get<PlayerInput>()?.Camera;
-            }
-            // If this script is on a weapon entity that's a child of the Player entity:
-            return this.Entity?.GetParent()?.Get<PlayerInput>()?.Camera;
+            var playerEntity = this.Entity?.GetParent(); 
+            return playerEntity?.Get<PlayerInput>()?.Camera;
         }
     }
 }

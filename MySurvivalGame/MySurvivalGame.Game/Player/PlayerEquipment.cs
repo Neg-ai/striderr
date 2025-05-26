@@ -5,247 +5,321 @@ using Stride.Engine;
 using Stride.Engine.Events; 
 using MySurvivalGame.Game.Weapons; 
 using MySurvivalGame.Game.Player;   
-using MySurvivalGame.Game.Items; 
-using MySurvivalGame.Game.World; // ADDED: For ResourceNodeComponent
-using Stride.Physics; // ADDED: For Raycasting
-using Stride.Core.Mathematics; // ADDED: For Matrix and Vector3
+using MySurvivalGame.Data.Items; // MODIFIED: For ItemData, ItemStack, ItemDatabase
+using MySurvivalGame.Game.World; 
+using Stride.Physics; 
+using Stride.Core.Mathematics;
+using System; // For Activator
+using System.Collections.Generic; // For Dictionary
 
 namespace MySurvivalGame.Game.Player 
 {
-    /// <summary>
-    /// Manages the equipment of a player, specifically their current weapon.
-    /// Also handles relaying input actions to the equipped weapon.
-    /// </summary>
     public class PlayerEquipment : ScriptComponent
     {
-        /// <summary>
-        /// Gets the currently equipped weapon.
-        /// </summary>
         public BaseWeapon CurrentWeapon { get; private set; }
-        private MySurvivalGame.Game.Items.WeaponToolData currentlyEquippedItemData; 
+        private int equippedSlotIndex = -1; 
+        private PlayerInventoryComponent playerInventory;
+
+        // TODO: Populate this map with ItemID -> ScriptType mappings
+        private Dictionary<string, Type> itemScriptMap = new Dictionary<string, Type>(); 
 
         private EventReceiver<bool> shootEventReceiver;
         private EventReceiver<bool> reloadEventReceiver;
         private EventReceiver shootReleasedEventReceiver; 
-        private EventReceiver interactReceiver; // ADDED
-
-        // REMOVED: Building related event receivers
-        // private EventReceiver toggleBuildModeEventReceiver;
-        // private EventReceiver rotateBuildLeftEventReceiver;
-        // private EventReceiver rotateBuildRightEventReceiver;
-        // private EventReceiver cycleBuildableNextEventReceiver;
-        // private EventReceiver cycleBuildablePrevEventReceiver;
-        // private EventReceiver debugDestroyEventReceiver;
-
-        // REMOVED: Building controller reference
-        // private BuildingPlacementController buildingPlacementController; 
+        private EventReceiver interactReceiver; 
+        private EventReceiver<int> hotbarSlotSelectedReceiver; // For hotbar selection
 
         public override void Start()
         {
             base.Start(); 
 
-            // Initialize event receivers for weapon actions
+            playerInventory = Entity.Get<PlayerInventoryComponent>();
+            if (playerInventory == null)
+            {
+                Log.Error("PlayerEquipment: PlayerInventoryComponent not found on the entity.");
+                // Potentially disable this component or throw an error
+                return;
+            }
+
+            // Example mapping - this would ideally be data-driven or more robust
+            itemScriptMap["stone_pickaxe"] = typeof(Hatchet); // Assuming Hatchet script can serve as a generic tool for now
+
             shootEventReceiver = new EventReceiver<bool>(PlayerInput.ShootEventKey);
             reloadEventReceiver = new EventReceiver<bool>(PlayerInput.ReloadEventKey);
             shootReleasedEventReceiver = new EventReceiver(PlayerInput.ShootReleasedEventKey);
-            interactReceiver = new EventReceiver(PlayerInput.InteractEventKey); // ADDED
+            interactReceiver = new EventReceiver(PlayerInput.InteractEventKey);
+            hotbarSlotSelectedReceiver = new EventReceiver<int>(PlayerInput.HotbarSlotSelectedEventKey);
+        }
+
+        private void UnequipCurrentWeapon()
+        {
+            if (CurrentWeapon != null)
+            {
+                Log.Info($"PlayerEquipment: Unequipping '{CurrentWeapon.Entity?.Name ?? "weapon"}'.");
+                CurrentWeapon.OnUnequip(this.Entity);
+                if (CurrentWeapon.Entity != null && CurrentWeapon.Entity.Parent == this.Entity)
+                {
+                    this.Entity.RemoveChild(CurrentWeapon.Entity);
+                    // Optionally, pool or destroy CurrentWeapon.Entity if it was dynamically created for the weapon
+                    // For now, just removing it as a child. If it was from a prefab, this is fine.
+                    // If it was new Entity("EquippedWeaponEntity"), it should be Entity.Scene = null;
+                }
+                CurrentWeapon = null;
+            }
+            equippedSlotIndex = -1;
+        }
+
+        public void EquipItemFromSlot(int slotIndex)
+        {
+            if (playerInventory == null)
+            {
+                Log.Error("PlayerEquipment: PlayerInventoryComponent is missing.");
+                return;
+            }
+
+            if (slotIndex < 0 || slotIndex >= playerInventory.MaxInventorySlots)
+            {
+                Log.Warning($"PlayerEquipment: Invalid slot index {slotIndex}.");
+                UnequipCurrentWeapon(); // Unequip if out of bounds index means nothing selected
+                return;
+            }
             
-            // REMOVED: Initialization of building event receivers
-            // REMOVED: Getting BuildingPlacementController
+            // If trying to equip the same slot that's already equipped, do nothing (or re-equip if desired)
+            // For now, let's allow re-equipping to refresh the item, might be useful.
+            // if (slotIndex == equippedSlotIndex && CurrentWeapon != null)
+            // {
+            //     Log.Info($"PlayerEquipment: Slot {slotIndex} is already equipped.");
+            //     return; 
+            // }
+
+            UnequipCurrentWeapon(); // Unequip previous item
+
+            ItemStack itemStack = playerInventory.GetItemStack(slotIndex);
+
+            if (itemStack == null || itemStack.Item == null)
+            {
+                Log.Info($"PlayerEquipment: No item in slot {slotIndex} to equip.");
+                // equippedSlotIndex is already -1 from UnequipCurrentWeapon
+                return;
+            }
+
+            equippedSlotIndex = slotIndex; // Set new equipped slot
+            ItemData itemToEquip = itemStack.Item;
+            Log.Info($"PlayerEquipment: Attempting to equip '{itemToEquip.ItemName}' from slot {slotIndex}. Type: {itemToEquip.Type}");
+
+            // Determine if the item is a weapon or tool that needs a script
+            if (itemToEquip.Type == ItemType.Weapon || itemToEquip.Type == ItemType.Tool)
+            {
+                // Try to find a script for this itemID
+                // For now, hardcoding for "stone_pickaxe" to use Hatchet script
+                Type weaponScriptType = null;
+                if (itemToEquip.ItemID == "stone_pickaxe") // Example specific lookup
+                {
+                    weaponScriptType = typeof(Hatchet); // Using Hatchet as a placeholder for pickaxe
+                }
+                // else if (itemScriptMap.TryGetValue(itemToEquip.ItemID, out var foundScriptType))
+                // {
+                //    weaponScriptType = foundScriptType;
+                // }
+
+                if (weaponScriptType != null)
+                {
+                    Log.Info($"PlayerEquipment: Found script type '{weaponScriptType.Name}' for item '{itemToEquip.ItemName}'.");
+                    var newWeaponEntity = new Entity("EquippedItemInstance"); // Name for debugging
+                    
+                    CurrentWeapon = (BaseWeapon)Activator.CreateInstance(weaponScriptType);
+                    if (CurrentWeapon == null)
+                    {
+                        Log.Error($"PlayerEquipment: Failed to create instance of script type '{weaponScriptType.Name}'.");
+                        equippedSlotIndex = -1; // Failed to equip
+                        return;
+                    }
+                    
+                    newWeaponEntity.Add(CurrentWeapon); 
+                    this.Entity.AddChild(newWeaponEntity); 
+
+                    CurrentWeapon.Configure(itemToEquip); // Pass ItemData to the weapon script
+                    CurrentWeapon.OnEquip(this.Entity); // Notify script it's equipped
+                    Log.Info($"PlayerEquipment: Successfully equipped '{itemToEquip.ItemName}' with script '{weaponScriptType.Name}'.");
+                }
+                else
+                {
+                    Log.Warning($"PlayerEquipment: No specific weapon/tool script found for ItemID '{itemToEquip.ItemID}'. Item will be 'held' but might not have actions.");
+                    // CurrentWeapon remains null, no script-based actions will occur.
+                }
+            }
+            else
+            {
+                Log.Info($"PlayerEquipment: Item '{itemToEquip.ItemName}' is not a weapon or tool. Equipped as passive item.");
+                // CurrentWeapon remains null.
+            }
+        }
+
+        private void SecondaryAction() // ADDED
+        {
+            if (equippedSlotIndex == -1)
+            {
+                // Log.Info("PlayerEquipment: No item equipped for secondary action.");
+                return;
+            }
+
+            ItemStack stack = playerInventory.GetItemStack(equippedSlotIndex);
+            if (stack == null || stack.Item == null)
+            {
+                Log.Error($"PlayerEquipment: Equipped slot {equippedSlotIndex} contains no item stack for secondary action. Unequipping.");
+                UnequipCurrentWeapon();
+                return;
+            }
+
+            if (stack.Item.Type != ItemType.Weapon && stack.Item.Type != ItemType.Tool)
+            {
+                // Log.Info($"PlayerEquipment: Item '{stack.Item.ItemName}' in slot {equippedSlotIndex} is not a weapon or tool. Cannot perform secondary action.");
+                return;
+            }
+            
+            if (stack.CurrentDurability <= 0)
+            {
+                Log.Info($"PlayerEquipment: Item '{stack.Item.ItemName}' is broken! Durability: {stack.CurrentDurability}. Cannot perform secondary action.");
+                return; 
+            }
+
+            if (CurrentWeapon != null)
+            {
+                Log.Info($"PlayerEquipment: Performing SecondaryAction for '{stack.Item.ItemName}' using script {CurrentWeapon.GetType().Name}. Durability before: {stack.CurrentDurability}");
+                CurrentWeapon.SecondaryAction(); // Delegate to the weapon script
+                
+                // Durability consumption for secondary action
+                float durabilityCost = 0.5f; // Example cost, can be different from primary
+                playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
+            }
+            else
+            {
+                Log.Warning($"PlayerEquipment: Item '{stack.Item.ItemName}' is a weapon/tool but has no active script (CurrentWeapon is null). Secondary action not performed by script.");
+                // Fallback or generic action if any? For now, just consume durability if it's a generic tool action.
+                // float durabilityCost = 0.5f;
+                // playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
+            }
         }
 
         public override void Update()
         {
-            // ADDED: Interaction logic
+            if (playerInventory == null) return;
+
+            // Hotbar selection
+            if (hotbarSlotSelectedReceiver.TryReceive(out int selectedSlot))
+            {
+                Log.Info($"PlayerEquipment: Hotbar slot {selectedSlot + 1} selected via input.");
+                EquipItemFromSlot(selectedSlot); // Hotbar indices are 0-based internally
+            }
+
             if (interactReceiver.TryReceive())
             {
                 AttemptResourceGather();
             }
 
-            // Handle Primary Action (Shoot)
             if (shootEventReceiver.TryReceive(out bool shootPressed) && shootPressed)
             {
-                // MODIFIED: Direct weapon action, removed TriggerCurrentWeaponPrimary call
-                if (CurrentWeapon == null)
-                {
-                    // Log.Warning("PlayerEquipment: No weapon equipped."); // Optional
-                }
-                else if (CurrentWeapon.IsBroken) 
-                {
-                    Log.Info($"PlayerEquipment: Cannot use primary action, {CurrentWeapon.Entity?.Name ?? "Current weapon"} is broken.");
-                }
-                else
-                {
-                    CurrentWeapon.PrimaryAction();
-                }
+                PrimaryAction();
             }
 
-            // Handle Shoot Release (for Bows)
             if (shootReleasedEventReceiver.TryReceive()) 
             {
-                // REMOVED: Building mode check
-                if (CurrentWeapon is BaseBowWeapon bowWeapon) // MODIFIED: Namespace for BaseBowWeapon
+                if (CurrentWeapon is BaseBowWeapon bowWeapon) 
                 {
                     bowWeapon.OnPrimaryActionReleased();
                 }
             }
 
-            // Handle Reload
             if (reloadEventReceiver.TryReceive(out bool reloadPressed) && reloadPressed)
             {
-                // REMOVED: Building mode check
-                if (CurrentWeapon != null && !CurrentWeapon.IsBroken) 
-                {
-                    CurrentWeapon.Reload();
-                }
-                else if (CurrentWeapon != null && CurrentWeapon.IsBroken)
-                {
-                     Log.Info($"PlayerEquipment: Cannot reload, {CurrentWeapon.Entity?.Name ?? "Current weapon"} is broken.");
-                }
-            }
-
-            // REMOVED: Debug Destroy action and its call
-        }
-
-        // REMOVED: DebugAttemptDestroyTarget() method
-
-        /// <summary>
-        /// Equips a new weapon. If a weapon is already equipped, it will be unequipped first.
-        /// </summary>
-        /// <param name="newWeapon">The new weapon to equip. Can be null to unequip.</param>
-        public void EquipWeapon(BaseWeapon newWeapon) 
-        {
-            if (CurrentWeapon != null)
-            {
-                CurrentWeapon.OnUnequip(this.Entity);
-                // Potentially destroy the old weapon entity if it was spawned
-            }
-
-            CurrentWeapon = newWeapon;
-
-            if (CurrentWeapon != null)
-            {
-                CurrentWeapon.OnEquip(this.Entity);
-                // Potentially attach the new weapon model to the player
+                Reload();
             }
         }
 
-        public void EquipItem(MySurvivalGame.Game.Items.MockInventoryItem itemToEquip)
+        private void PrimaryAction()
         {
-            // Unequip current item's logic (conceptual for now)
-            if (currentlyEquippedItemData != null)
+            if (equippedSlotIndex == -1)
             {
-                Log.Info($"PlayerEquipment: Unequipping '{currentlyEquippedItemData.Name}'.");
-                // Future: Call OnUnequip on the actual weapon entity if one was spawned.
-                // CurrentWeapon (BaseWeapon script instance) might be set to null here if it represented this item.
+                // Log.Info("PlayerEquipment: No item equipped for primary action.");
+                return;
             }
 
-            currentlyEquippedItemData = null; // Clear it first
-
-            if (itemToEquip != null)
+            ItemStack stack = playerInventory.GetItemStack(equippedSlotIndex);
+            if (stack == null || stack.Item == null)
             {
-                if (itemToEquip.CurrentEquipmentType == EquipmentType.Weapon || 
-                    itemToEquip.CurrentEquipmentType == EquipmentType.Tool)
-                {
-                    if (itemToEquip is WeaponToolData castedItem)
-                    {
-                        currentlyEquippedItemData = castedItem;
-                        Log.Info($"PlayerEquipment: Equipped '{currentlyEquippedItemData.Name}' (Type: {currentlyEquippedItemData.CurrentEquipmentType}, Damage: {currentlyEquippedItemData.Damage}, Durability: {currentlyEquippedItemData.DurabilityPoints}/{currentlyEquippedItemData.MaxDurabilityPoints}).");
-                        // Future: Spawn actual weapon entity, get its BaseWeapon script, call EquipWeapon(baseWeaponScript)
-                    }
-                    else
-                    {
-                        Log.Error($"PlayerEquipment: Item '{itemToEquip.Name}' is a Weapon/Tool but could not be cast to WeaponToolData. Check item creation.");
-                    }
-                }
-                else
-                {
-                    Log.Info($"PlayerEquipment: Item '{itemToEquip.Name}' is not a Weapon or Tool. Cannot equip in main weapon slot. (Type: {itemToEquip.CurrentEquipmentType})");
-                }
+                Log.Error($"PlayerEquipment: Equipped slot {equippedSlotIndex} contains no item stack. Unequipping.");
+                UnequipCurrentWeapon();
+                return;
+            }
+
+            if (stack.Item.Type != ItemType.Weapon && stack.Item.Type != ItemType.Tool)
+            {
+                Log.Info($"PlayerEquipment: Item '{stack.Item.ItemName}' in slot {equippedSlotIndex} is not a weapon or tool. Cannot perform primary action.");
+                return;
+            }
+            
+            if (stack.CurrentDurability <= 0)
+            {
+                Log.Info($"PlayerEquipment: Item '{stack.Item.ItemName}' is broken! Durability: {stack.CurrentDurability}");
+                // Optionally play a "broken tool/weapon" sound or visual feedback
+                return; 
+            }
+
+            if (CurrentWeapon != null)
+            {
+                Log.Info($"PlayerEquipment: Performing PrimaryAction for '{stack.Item.ItemName}' using script {CurrentWeapon.GetType().Name}. Durability before: {stack.CurrentDurability}");
+                CurrentWeapon.PrimaryAction(); // Delegate to the weapon script
+                
+                // Durability consumption
+                float durabilityCost = 1.0f; // Example cost, can be action/item specific
+                playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
+                // Log.Info($"PlayerEquipment: Durability after action for '{stack.Item.ItemName}': {playerInventory.GetItemStack(equippedSlotIndex)?.CurrentDurability}");
             }
             else
             {
-                Log.Info("PlayerEquipment: No item equipped (itemToEquip was null).");
-                // Future: Call EquipWeapon(null) to clear any actual BaseWeapon script instance.
+                Log.Warning($"PlayerEquipment: Item '{stack.Item.ItemName}' is a weapon/tool but has no active script (CurrentWeapon is null). Primary action not performed by script.");
+                // Fallback or generic action if any? For now, just consume durability.
+                float durabilityCost = 1.0f;
+                playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
+            }
+        }
+
+        private void Reload()
+        {
+            if (CurrentWeapon != null)
+            {
+                ItemStack stack = playerInventory.GetItemStack(equippedSlotIndex);
+                if (stack != null && stack.CurrentDurability <= 0)
+                {
+                    Log.Info($"PlayerEquipment: Cannot reload, {CurrentWeapon.Entity?.Name ?? "Current weapon"} is broken (via ItemStack).");
+                    return;
+                }
+                Log.Info($"PlayerEquipment: Reloading '{CurrentWeapon.Entity?.Name ?? "weapon"}'.");
+                CurrentWeapon.Reload();
+                // Reload might also consume durability or have other effects.
+            }
+            else
+            {
+                // Log.Info("PlayerEquipment: No weapon equipped to reload.");
             }
         }
         
-        /// <summary>
-        /// Triggers the primary action of the currently equipped weapon.
-        /// </summary>
-        public void TriggerCurrentWeaponPrimary()
-        {
-            if (currentlyEquippedItemData == null)
-            {
-                // Log.Info("PlayerEquipment: No item equipped to use."); // Optional, can be verbose
-                return;
-            }
-
-            if (currentlyEquippedItemData.IsBroken)
-            {
-                Log.Info($"PlayerEquipment: Item '{currentlyEquippedItemData.Name}' is broken. Cannot use.");
-                return;
-            }
-
-            // --- Durability Consumption ---
-            // For now, consume a fixed amount. This could vary by item or action later.
-            float durabilityCost = 1.0f; 
-            currentlyEquippedItemData.DurabilityPoints -= durabilityCost;
-
-            // Ensure durability doesn't go below zero before updating IsBroken & base Durability
-            if (currentlyEquippedItemData.DurabilityPoints < 0)
-            {
-                currentlyEquippedItemData.DurabilityPoints = 0;
-            }
-            
-            // Call the UpdateDurability method in WeaponToolData to correctly update IsBroken and sync base.Durability
-            currentlyEquippedItemData.UpdateDurability(currentlyEquippedItemData.DurabilityPoints);
-
-            Log.Info($"PlayerEquipment: Used '{currentlyEquippedItemData.Name}'. Durability: {currentlyEquippedItemData.DurabilityPoints}/{currentlyEquippedItemData.MaxDurabilityPoints}. Broken: {currentlyEquippedItemData.IsBroken}");
-
-            if (currentlyEquippedItemData.IsBroken)
-            {
-                Log.Warning($"PlayerEquipment: Item '{currentlyEquippedItemData.Name}' just broke!");
-                // Future: Play a 'broken item' sound or visual effect.
-            }
-            // --- End Durability Consumption ---
-
-            // Call the actual weapon's action (if a BaseWeapon script instance is equipped)
-            // This part remains for future integration with actual weapon scripts.
-            if (CurrentWeapon != null) // CurrentWeapon is the BaseWeapon script instance
-            {
-                // CurrentWeapon.PrimaryAction(); // This will be called on the actual weapon script
-            }
-            else
-            {
-                Log.Info($"PlayerEquipment: Primary action triggered for item data '{currentlyEquippedItemData.Name}', but no specific weapon script (CurrentWeapon) is active.");
-            }
-        }
-
-        /// <summary>
-        /// Triggers the secondary action of the currently equipped weapon.
-        /// </summary>
-        public void TriggerCurrentWeaponSecondary()
-        {
-            if (CurrentWeapon == null)
-            {
-                return;
-            }
-
-            if (CurrentWeapon.IsBroken)
-            {
-                Log.Info($"PlayerEquipment: Cannot use secondary action, {CurrentWeapon.Entity?.Name ?? "Current weapon"} is broken.");
-                return;
-            }
-
-            CurrentWeapon.SecondaryAction();
-        }
-
         private void AttemptResourceGather()
         {
-            // The condition for hand gathering "!(this.Entity.Get<PlayerInput>()?.Camera?.Get<PlayerCamera>()?.IsFPSCrouched ?? false)"
-            // was an example and is removed for clarity. We will rely on the ResourceNodeComponent's ToolCategory.
-            // If currentlyEquippedItemData is null, ResourceNodeComponent.HitNode will handle it (e.g. if ToolCategory is Hand).
+            if (equippedSlotIndex == -1)
+            {
+                // Log.Info("PlayerEquipment: No item equipped for resource gathering.");
+                // Allow hand gathering if implemented in ResourceNodeComponent.HitNode
+            }
+
+            ItemStack currentToolStack = playerInventory.GetItemStack(equippedSlotIndex);
+            ItemData currentToolData = currentToolStack?.Item; // This can be null if no item is equipped
+
+            if (currentToolStack != null && currentToolStack.CurrentDurability <= 0)
+            {
+                Log.Info($"PlayerEquipment: Tool '{currentToolStack.Item.ItemName}' is broken! Cannot gather.");
+                return;
+            }
 
             var playerInput = this.Entity.Get<PlayerInput>();
             if (playerInput == null || playerInput.Camera == null)
@@ -254,7 +328,7 @@ namespace MySurvivalGame.Game.Player
                 return;
             }
 
-            var camera = playerInput.Camera; // This is the CameraComponent
+            var camera = playerInput.Camera; 
             var simulation = this.GetSimulation();
             if (simulation == null)
             {
@@ -262,67 +336,43 @@ namespace MySurvivalGame.Game.Player
                 return;
             }
 
-            Matrix cameraWorldMatrix = camera.Entity.Transform.WorldMatrix; // Camera's entity transform
+            Matrix cameraWorldMatrix = camera.Entity.Transform.WorldMatrix;
             Vector3 raycastStart = cameraWorldMatrix.TranslationVector;
             Vector3 raycastForward = cameraWorldMatrix.Forward;
-            float gatherRange = 2.0f; // Max distance for gathering
+            float gatherRange = 2.0f; 
 
-            // Perform raycast
             var hitResult = simulation.Raycast(raycastStart, raycastStart + raycastForward * gatherRange);
 
             if (hitResult.Succeeded && hitResult.Collider != null)
             {
                 var hitEntity = hitResult.Collider.Entity;
                 var resourceNode = hitEntity?.Get<MySurvivalGame.Game.World.ResourceNodeComponent>();
-                var playerInventory = this.Entity.Get<PlayerInventoryComponent>();
 
-                if (resourceNode != null && playerInventory != null)
+                if (resourceNode != null)
                 {
                     Log.Info($"PlayerEquipment: Interacted with '{hitEntity.Name}' which has a ResourceNodeComponent.");
                     
-                    // Try to hit the node with the currently equipped tool (which might be null)
-                    var harvestedItem = resourceNode.HitNode(currentlyEquippedItemData, playerInventory);
+                    var harvestedItem = resourceNode.HitNode(currentToolData, playerInventory); // Pass ItemData or null
 
-                    if (harvestedItem != null) // HitNode returns an item if harvest was successful
+                    if (harvestedItem != null) 
                     {
-                        Log.Info($"PlayerEquipment: Successfully harvested '{harvestedItem.Name}' using '{currentlyEquippedItemData?.Name ?? "Hands (conceptual)"}'.");
+                        Log.Info($"PlayerEquipment: Successfully harvested '{harvestedItem.ItemName}' using '{currentToolData?.ItemName ?? "Hands"}'.");
                         
-                        // If a tool was used (not null) and harvest was successful, consume durability
-                        if (currentlyEquippedItemData != null)
+                        if (currentToolData != null && (currentToolData.Type == ItemType.Tool || currentToolData.Type == ItemType.Weapon))
                         {
-                            if (currentlyEquippedItemData.IsBroken) // Check if tool was already broken
-                            {
-                                Log.Info($"PlayerEquipment: Tool '{currentlyEquippedItemData.Name}' is broken. Cannot use further for gathering.");
-                                // Note: HitNode might still allow harvest if tool isn't strictly required or if it just broke.
-                                // If HitNode returned an item, it means harvest occurred. We just log tool status here.
-                                return; 
-                            }
-
-                            float durabilityCost = 1.0f; // Specific to gathering action
-                            currentlyEquippedItemData.DurabilityPoints -= durabilityCost;
-                            // No need to clamp here as UpdateDurability will handle it.
-                            
-                            currentlyEquippedItemData.UpdateDurability(currentlyEquippedItemData.DurabilityPoints); // This updates IsBroken and base.Durability
-
-                            Log.Info($"PlayerEquipment: Tool '{currentlyEquippedItemData.Name}' durability: {currentlyEquippedItemData.DurabilityPoints}/{currentlyEquippedItemData.MaxDurabilityPoints}. Broken: {currentlyEquippedItemData.IsBroken}");
-                            if (currentlyEquippedItemData.IsBroken)
-                            {
-                                Log.Warning($"PlayerEquipment: Tool '{currentlyEquippedItemData.Name}' just broke from gathering!");
-                                // Future: Player notification, potentially unequip, etc.
-                            }
+                            // Durability cost for successful gather with a tool
+                            float durabilityCost = 1.0f; 
+                            playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
+                            // Log.Info($"PlayerEquipment: Tool '{currentToolData.ItemName}' durability after gathering: {playerInventory.GetItemStack(equippedSlotIndex)?.CurrentDurability}.");
                         }
                     }
-                    // If harvestedItem is null, HitNode already logged why (e.g. wrong tool, depleted, inventory full)
                 }
-                else
-                {
-                    // Log.Info($"PlayerEquipment: Interacted with '{hitEntity.Name}', but it's not a resource node or player inventory is missing.");
-                }
-            }
-            else
-            {
-                // Log.Info("PlayerEquipment: Interaction raycast hit nothing in range.");
             }
         }
+        
+        // REMOVED: Old EquipWeapon(BaseWeapon newWeapon) - replaced by EquipItemFromSlot
+        // REMOVED: Old EquipItem(MockInventoryItem itemToEquip) - replaced by EquipItemFromSlot
+        // REMOVED: Old TriggerCurrentWeaponPrimary() - logic moved into PrimaryAction()
+        // REMOVED: Old TriggerCurrentWeaponSecondary() - will be re-added if needed, simpler for now
     }
 }

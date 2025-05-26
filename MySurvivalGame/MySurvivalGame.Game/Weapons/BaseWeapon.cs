@@ -5,31 +5,41 @@
 using Stride.Engine;
 // Potentially using MySurvivalGame.Game.Core for ITargetable if needed later
 // Potentially using MySurvivalGame.Game.Items for MaterialType if needed later
+using MySurvivalGame.Data.Items; // Required for ItemData
 
 namespace MySurvivalGame.Game.Weapons
 {
-    public abstract class BaseWeapon : ScriptComponent // Or EntityComponent, or just a class if not a component itself
+    public abstract class BaseWeapon : ScriptComponent 
     {
-        public virtual bool IsBroken { get; protected set; } = false;
-        public virtual float Durability { get; protected set; } = 1.0f; // Example: 1.0 = 100%
+        public ItemData ConfiguredItemData { get; protected set; }
+
+        // IsBroken and Durability are now primarily managed by PlayerEquipment via ItemStack.
+        // These properties can be removed from BaseWeapon if the weapon script itself
+        // doesn't need to react to its own broken state independently of PlayerEquipment's checks.
+        // For now, they can remain but might be unused or reflect initial state.
+        public virtual bool IsBrokenProxy => ConfiguredItemData == null || (Entity?.Get<Player.PlayerEquipment>()?.GetItemStack(Entity.Get<Player.PlayerEquipment>().EquippedSlotIndex)?.CurrentDurability ?? 0) <= 0;
+        public virtual float DurabilityProxy => Entity?.Get<Player.PlayerEquipment>()?.GetItemStack(Entity.Get<Player.PlayerEquipment>().EquippedSlotIndex)?.CurrentDurability ?? 0;
+
+
+        public virtual void Configure(ItemData data)
+        {
+            ConfiguredItemData = data;
+            Log.Info($"BaseWeapon {this.GetType().Name} configured with ItemID: {data?.ItemID ?? "NULL"}");
+        }
 
         public abstract void PrimaryAction();
         public abstract void SecondaryAction();
         public abstract void Reload();
-        public abstract void OnEquip(Entity owner);
-        public abstract void OnUnequip(Entity owner);
+        public abstract void OnEquip(Entity owner); // Owner is the player entity
+        public abstract void OnUnequip(Entity owner); // Owner is the player entity
 
-        // Placeholder for potential bow functionality, if BaseBowWeapon is to exist
+        // Placeholder for potential bow functionality
         public virtual void OnPrimaryActionReleased() { } 
     }
 
-    // Placeholder for BaseBowWeapon if referenced by PlayerEquipment
-    // (PlayerEquipment.cs was modified to use MySurvivalGame.Game.Weapons.BaseBowWeapon)
+    // BaseBowWeapon remains as it was, inheriting the new Configure method and ConfiguredItemData.
     public abstract class BaseBowWeapon : BaseWeapon 
     {
         // Specific bow logic would go here
-        // For example:
-        // public abstract void ChargeShot(float chargeTime);
-        // public override void OnPrimaryActionReleased() { /* Fire Arrow based on charge */ }
     }
 }

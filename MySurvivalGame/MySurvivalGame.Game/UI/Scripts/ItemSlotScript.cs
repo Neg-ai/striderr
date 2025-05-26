@@ -9,9 +9,9 @@ using Stride.UI.Controls; // For ImageElement, TextBlock, ProgressBar
 using Stride.UI.Events;   // For PointerEventArgs
 using Stride.UI.Panels;   // For Grid (if RootPanel is needed)
 using Stride.Input;       // For Input (used in InventoryPanelScript, good to have consistent usings)
-using MySurvivalGame.Game.Items; // MODIFIED: To ensure MockInventoryItem is found after its namespace change
+using MySurvivalGame.Data.Items; // MODIFIED: For ItemStack, ItemData
 
-namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
+namespace MySurvivalGame.Game.UI.Scripts 
 {
     public class ItemSlotScript : UIScript
     {
@@ -19,14 +19,12 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
         public TextBlock QuantityText { get; set; }
         public ProgressBar DurabilityBar { get; set; }
         
-        // Internal reference to the root of this slot's UI, typically a Grid.
-        public UIElement RootElement { get; private set; } // Made public getter for bounds checking
+        public UIElement RootElement { get; private set; } 
 
-        // Fields for drag state
         private bool isDragging = false;
-        public Vector2 DragOffset { get; private set; } // Public for InventoryPanelScript to use
+        public Vector2 DragOffset { get; private set; } 
         public static ItemSlotScript CurrentlyDraggedSlot { get; private set; }
-        public MockInventoryItem ItemData { get; set; } // MODIFIED: Type changed to directly use MockInventoryItem from MySurvivalGame.Game.Items
+        public ItemStack CurrentItemStack { get; private set; } // MODIFIED: Property name and type
 
         private InventoryPanelScript parentPanelScript;
 
@@ -71,22 +69,31 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
         }
 
         /// <summary>
-        /// Sets the item data for this slot, updating its visual representation.
+        /// Sets the item data for this slot based on an ItemStack, updating its visual representation.
         /// </summary>
-        /// <param name="iconTexture">The texture for the item's icon.</param>
-        /// <param name="quantity">The quantity of the item.</param>
-        /// <param name="durability">The item's durability (0.0 to 1.0). Null if item has no durability.</param>
-        /// <param name="itemObject">The actual data object for the item of type MockInventoryItem.</param>
-        public void SetItemData(Texture iconTexture, int quantity, float? durability, MockInventoryItem itemObject = null) // MODIFIED: Type for itemObject
+        public void SetItemStack(ItemStack stack)
         {
-            ItemData = itemObject; 
+            this.CurrentItemStack = stack;
+
+            if (stack == null || stack.Item == null)
+            {
+                ClearSlot();
+                return;
+            }
+
+            ItemData item = stack.Item;
             
+            // Icon
             if (ItemIconImage != null)
             {
-                if (iconTexture != null)
+                if (!string.IsNullOrEmpty(item.IconPath))
                 {
-                    ItemIconImage.Source = new SpriteFromTexture(iconTexture);
-                    ItemIconImage.Visibility = Visibility.Visible;
+                    // TODO: Implement robust texture loading. For now, log path.
+                    // Example: ItemIconImage.Source = new SpriteFromTexture(Content.Load<Texture>(item.IconPath));
+                    Log.Info($"ItemSlot '{this.Entity.Name}': SetItemStack - IconPath: {item.IconPath} (Texture loading placeholder)");
+                    // For testing, we can clear it or use a placeholder if one exists
+                    ItemIconImage.Source = null; // Placeholder: No icon loaded
+                    ItemIconImage.Visibility = Visibility.Visible; // Show if there's an item, even if icon fails to load for now
                 }
                 else
                 {
@@ -95,18 +102,30 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
                 }
             }
 
+            // Quantity
             if (QuantityText != null)
             {
-                QuantityText.Text = quantity > 1 ? quantity.ToString() : "";
-                QuantityText.Visibility = quantity > 1 ? Visibility.Visible : Visibility.Hidden;
+                QuantityText.Text = stack.Quantity > 1 ? stack.Quantity.ToString() : "";
+                QuantityText.Visibility = stack.Quantity > 1 ? Visibility.Visible : Visibility.Hidden;
             }
 
+            // Durability
             if (DurabilityBar != null)
             {
-                if (durability.HasValue && durability > 0f && durability < 1f) // Show only if relevant
+                if (item.Type == ItemType.Tool || item.Type == ItemType.Weapon)
                 {
-                    DurabilityBar.Visibility = Visibility.Visible;
-                    DurabilityBar.Value = durability.Value;
+                    // Assuming max durability is ItemStack.DefaultMaxDurability or from ItemData if available
+                    float maxDurability = ItemStack.DefaultMaxDurability; // Or item.ToolData?.MaxDurability ?? ItemStack.DefaultMaxDurability;
+                    if (maxDurability > 0)
+                    {
+                        DurabilityBar.Value = stack.CurrentDurability / maxDurability;
+                        // Show if not full durability, or always if it has durability? For now, show if not full.
+                        DurabilityBar.Visibility = (stack.CurrentDurability < maxDurability && stack.CurrentDurability > 0) ? Visibility.Visible : Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        DurabilityBar.Visibility = Visibility.Collapsed;
+                    }
                 }
                 else
                 {
@@ -115,18 +134,28 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
             }
         }
         
-        // Helper methods to get current visual data for swapping
-        public Texture GetIconTexture() => (ItemIconImage?.Source as SpriteFromTexture)?.Texture;
-        public int GetQuantity() => ItemData?.Quantity ?? (int.TryParse(QuantityText?.Text, out int qty) ? qty : 0);
-        public float? GetDurability() => ItemData?.Durability ?? (DurabilityBar?.Visibility == Visibility.Visible ? (float?)DurabilityBar.Value : null);
+        // Helper methods to get current visual data
+        public Texture GetIconTexture() 
+        {
+            // This would need to access the loaded texture if ItemIconImage.Source is set.
+            // For now, it's challenging without direct Texture reference in CurrentItemStack.Item
+            return (ItemIconImage?.Source as SpriteFromTexture)?.Texture;
+        }
+        public int GetQuantity() => CurrentItemStack?.Quantity ?? 0;
+        public float? GetDurabilityNormalized() 
+        {
+            if (CurrentItemStack != null && (CurrentItemStack.Item.Type == ItemType.Tool || CurrentItemStack.Item.Type == ItemType.Weapon))
+            {
+                float maxDurability = ItemStack.DefaultMaxDurability; // Or from ItemData if available
+                return maxDurability > 0 ? CurrentItemStack.CurrentDurability / maxDurability : (float?)null;
+            }
+            return null;
+        }
 
 
-        /// <summary>
-        /// Clears the item slot, making it appear empty.
-        /// </summary>
         public void ClearSlot()
         {
-            ItemData = null; // Clear the data object
+            CurrentItemStack = null; 
             if (ItemIconImage != null)
             {
                 ItemIconImage.Source = null;
@@ -146,9 +175,8 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
         public override void OnPointerPressed(PointerEventArgs args)
         {
             base.OnPointerPressed(args);
-            // Log.Info($"ItemSlot '{this.Entity.Name}': Pointer Pressed. Button: {args.MouseButton}");
 
-            if (args.MouseButton == MouseButton.Left && (ItemData != null || ItemIconImage?.Source != null))
+            if (args.MouseButton == MouseButton.Left && CurrentItemStack != null) // MODIFIED: Check CurrentItemStack
             {
                 isDragging = true;
                 CurrentlyDraggedSlot = this;
