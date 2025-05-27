@@ -18,6 +18,10 @@ namespace MySurvivalGame.Game
 
         public static readonly EventKey<Vector2> CameraDirectionEventKey = new EventKey<Vector2>();
         public static readonly EventKey SwitchCameraModeEventKey = new EventKey(); // MODIFIED: Uncommented
+        public static readonly EventKey JumpEventKey = new EventKey(); // ADDED: For Jump
+        public static readonly EventKey ToggleMeleeModeEventKey = new EventKey(); // ADDED: For Melee Mode Toggle
+        public static readonly EventKey ToggleLockOnEventKey = new EventKey(); // ADDED: For Lock-On
+        public static readonly EventKey<int> SwitchLockOnTargetEventKey = new EventKey<int>(); // ADDED: For Lock-On Target Switching
         public static readonly EventKey<int> HotbarSlotSelectedEventKey = new EventKey<int>(); // ADDED: For hotbar selection
         public static readonly EventKey InteractEventKey = new EventKey(); // ADDED: For interaction
 
@@ -48,6 +52,14 @@ namespace MySurvivalGame.Game
         public List<Keys> KeysRight { get; set; } = new List<Keys>() { Keys.D, Keys.Right }; // MODIFIED: Uncommented
         public List<Keys> KeysUp { get; set; } = new List<Keys>() { Keys.W, Keys.Up }; // MODIFIED: Uncommented
         public List<Keys> KeysDown { get; set; } = new List<Keys>() { Keys.S, Keys.Down }; // MODIFIED: Uncommented
+        public List<Keys> KeysJump { get; set; } = new List<Keys>() { Keys.Space }; // ADDED: For Jump
+        public List<Keys> KeysToggleMeleeMode { get; set; } = new List<Keys>() { Keys.V }; // ADDED: For Melee Mode Toggle
+        public List<Keys> KeysToggleLockOn { get; set; } = new List<Keys>() { Keys.MiddleMouseButton, Keys.R3 }; // ADDED: For Lock-On
+        public List<Keys> KeysSwitchLockOnTargetNext { get; set; } = new List<Keys>() { Keys.MouseWheelUp }; // ADDED: For Lock-On Target Switching (MouseWheelUp for next)
+        public List<Keys> KeysSwitchLockOnTargetPrevious { get; set; } = new List<Keys>() { Keys.MouseWheelDown }; // ADDED: For Lock-On Target Switching (MouseWheelDown for previous)
+        // Gamepad for target switching (RightShoulder/LeftShoulder) will be handled if we add specific gamepad logic or map them to abstract buttons.
+        // For now, MouseWheel is primary. If R/L Shoulder are needed, they can be added to these lists or as separate bindings.
+
         // public List<Keys> KeysReload { get; set; } = new List<Keys>() { Keys.R };
         public List<Keys> KeysSwitchCamera { get; set; } = new List<Keys>() { Keys.T }; // MODIFIED: Uncommented
         // public List<Keys> KeysToggleBuildMode { get; set; } = new List<Keys>() { Keys.B };
@@ -163,6 +175,69 @@ namespace MySurvivalGame.Game
                 // ... (building mode logic) ...
             }
             */
+
+            // Jump logic
+            {
+                if (KeysJump.Any(key => Input.IsKeyPressed(key)))
+                {
+                    JumpEventKey.Broadcast();
+                }
+            }
+
+            // Melee Mode Toggle Logic
+            {
+                if (KeysToggleMeleeMode.Any(key => Input.IsKeyPressed(key)))
+                {
+                    ToggleMeleeModeEventKey.Broadcast();
+                }
+            }
+
+            // Lock-On Logic
+            {
+                if (KeysToggleLockOn.Any(key => Input.IsKeyPressed(key)))
+                {
+                    ToggleLockOnEventKey.Broadcast();
+                }
+                if (KeysSwitchLockOnTargetNext.Any(key => Input.IsKeyPressed(key))) // Note: MouseWheelUp might be tricky as IsKeyPressed
+                {
+                    // For mouse wheel, checking delta is better. Input.MouseWheelDelta is a float.
+                    // This simple IsKeyPressed might not work as expected for MouseWheelUp/Down directly.
+                    // A more robust way for mouse wheel:
+                    // if (Input.MouseWheelDelta > 0) SwitchLockOnTargetEventKey.Broadcast(1);
+                    // if (Input.MouseWheelDelta < 0) SwitchLockOnTargetEventKey.Broadcast(-1);
+                    // However, to stick to the List<Keys> pattern for now:
+                    SwitchLockOnTargetEventKey.Broadcast(1);
+                }
+                if (KeysSwitchLockOnTargetPrevious.Any(key => Input.IsKeyPressed(key)))
+                {
+                    SwitchLockOnTargetEventKey.Broadcast(-1);
+                }
+
+                // More robust mouse wheel handling
+                if (Input.MouseWheelDelta > 0)
+                {
+                    if (!KeysSwitchLockOnTargetNext.Contains(Keys.MouseWheelUp)) // Avoid double broadcast if already handled by IsKeyPressed
+                    {
+                         SwitchLockOnTargetEventKey.Broadcast(1);
+                    }
+                }
+                else if (Input.MouseWheelDelta < 0)
+                {
+                    if (!KeysSwitchLockOnTargetPrevious.Contains(Keys.MouseWheelDown)) // Avoid double broadcast
+                    {
+                        SwitchLockOnTargetEventKey.Broadcast(-1);
+                    }
+                }
+                // Gamepad RightShoulder/LeftShoulder for target switching (example)
+                if (Input.IsGamepadButtonDownAny(0, GamepadButton.RightShoulder) && Input.IsGamepadButtonReleasedAny(0, GamepadButton.RightShoulder)) // Pressed this frame
+                {
+                     SwitchLockOnTargetEventKey.Broadcast(1);
+                }
+                if (Input.IsGamepadButtonDownAny(0, GamepadButton.LeftShoulder) && Input.IsGamepadButtonReleasedAny(0, GamepadButton.LeftShoulder)) // Pressed this frame
+                {
+                     SwitchLockOnTargetEventKey.Broadcast(-1);
+                }
+            }
             
             // Debug Destroy logic commented out
             /*

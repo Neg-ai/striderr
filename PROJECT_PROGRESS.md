@@ -191,8 +191,17 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
 
 ### 4.2. Tasks (with example prompts for an AI assistant)
 
-*   **TASK-001-A: Implement FPS/TPS camera and movement.**
+*   **[IN PROGRESS] TASK-001-A: Implement FPS/TPS camera and movement.**
     *   **Prompt/Description:** "Create a new Stride 4.2.0.2381 project. Set up a basic scene with a ground plane. Adapt existing template scripts: `PlayerCamera.cs` for switchable FPS/TPS views (with camera collision handling), `PlayerInput.cs` for input event management, and `PlayerController.cs` (utilizing `CharacterComponent`) for player movement (WASD, jump).
+    *   **Current Status (TASK-001-A):**
+        *   **DONE:** Basic project and scene verified.
+        *   **DONE:** FPS/TPS camera switching, basic movement (WASD, jump), and basic TPS camera collision implemented.
+        *   **DONE:** Framework for dual melee mode toggle (Standard/SoulsLike) implemented (input and state).
+        *   **DONE:** Initial Souls-like lock-on system implemented (target acquisition, selection, basic player/camera orientation, input).
+        *   **PARTIALLY DONE (Blocked):** `PlayerAnimationController.cs` created for basic Mixamo animation playback (idle, walk, run). **However, the required placeholder character model and animation files (Idle, Walk, Run) were NOT found in `MySurvivalGame/Resources/Models` or `MySurvivalGame/Resources/Animations`. These assets are required to proceed with animation testing and further development of animation-dependent features.**
+        *   **PENDING:** Detailed Souls-like combat mechanics (specific attack states, combos, parrying, stamina integration beyond toggle).
+        *   **PENDING:** Advanced animation blending (upper/lower body separation as per design outline).
+        *   **PENDING:** Full integration and testing of all listed sub-features in the original prompt for TASK-001-A.
     *   **Souls-like Melee Mechanics Integration:** Investigate Stride3D's capabilities for core Souls-like features: target lock-on, target switching (e.g., mouse wheel or dedicated keys), and dynamic camera adjustments for optimal combat visibility. Explore implementing distinct melee attack states (e.g., light, heavy, special) and basic combo sequences. Add new input events to `PlayerInput.cs` for lock-on, dodge, and different attack types. Consider how player model orientation and movement should adapt when locked onto a target (e.g., strafing, maintaining focus).
     *   **Animation System with Mixamo Blending:** Investigate Stride's animation system for advanced blending techniques, particularly upper/lower body animation separation and merging (inspired by the user's three.js ragdoll/animation example, focusing on animation aspects here). Use a placeholder character model initially and integrate a selection of Mixamo animations (e.g., idle, walk, run, basic attacks, dodge). This includes the sub-task of pre-processing or designing a workflow to generate separate upper-body (e.g., aiming, attacking) and lower-body (e.g., walking, running, strafing) animation clips from full-body Mixamo animations. Implement initial logic in an animation controller script to play and blend these clips based on player state (e.g., lower body plays walk/run, upper body plays idle or aiming). Note that physics-based ragdoll effects for realistic damage feedback and death animations are a related but distinct future task (`TASK-002-B`).
     *   **Input Remapping Clarification:** The initial setup will utilize the template's approach for input handling (e.g., hardcoded key lists or simple mapping in `PlayerInput.cs`). Full UI-driven input remapping is a more extensive feature planned for `TASK-004-C`.

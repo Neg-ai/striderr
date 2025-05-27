@@ -28,12 +28,12 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
         /// <summary>
         /// The default distance from the player to the TPS camera
         /// </summary>
-        public float DefaultTpsDistance { get; set; } = 4.0f;
+        public float DefaultTpsDistance { get; set; } = 3.0f; // Subtask specified 3.0f
 
         /// <summary>
-        /// The default height offset of the TPS camera target relative to the character root
+        /// The default height offset of the TPS camera target relative to the character root (from Player's origin)
         /// </summary>
-        public float DefaultTpsHeightOffset { get; set; } = 1.8f; // Slightly above player head
+        public float DefaultTpsHeightOffset { get; set; } = 0.5f; // Subtask specified new Vector3(0, 0.5f, 0) for orbit target offset
 
         /// <summary>
         /// How far the TPS camera should stay from obstacles
@@ -73,9 +73,13 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
         private Simulation simulation; 
         private Vector2 currentCameraInputDelta; // Stores mouse/gamepad input from PlayerInput
 
+using MySurvivalGame.Game.Combat; // For TargetableComponent
+
         // Event listeners
         private EventReceiver<Vector2> cameraDirectionEventListener;
         private EventListener<EventKey> switchCameraModeEventListener;
+
+        private PlayerController playerControllerRef; // Reference to PlayerController for lock-on state
 
 
         public override void Start()
@@ -93,6 +97,16 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
                 // This assumes player's forward is along Z. If not, adjust yaw offset.
                 pitch = MathUtil.Clamp(initialPitch, MathUtil.DegreesToRadians(RotationXMin), MathUtil.DegreesToRadians(RotationXMax));
 
+                // Get PlayerController reference
+                playerControllerRef = Player.Get<PlayerController>();
+                if (playerControllerRef == null)
+                {
+                    Log.Error("PlayerCamera could not find PlayerController component on the Player entity.");
+                }
+            }
+            else
+            {
+                Log.Error("PlayerCamera: Player entity is not assigned.");
             }
 
 
@@ -172,36 +186,74 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
             if (Player == null || PlayerInput == null || Entity == null) // Entity is the camera entity itself
                 return;
 
-            // Receive camera input delta from PlayerInput event
+            if (playerControllerRef != null && playerControllerRef.IsLockedOn && playerControllerRef.CurrentLockOnTarget != null)
+            {
+                var targetComponent = playerControllerRef.CurrentLockOnTarget.Get<TargetableComponent>();
+                if (targetComponent != null)
+                {
+                    Vector3 targetLockOnPoint = targetComponent.GetWorldLockOnPoint();
+                    Vector3 playerReferencePosition;
+                    if (currentMode == CameraMode.FPS)
+                    {
+                        playerReferencePosition = Player.Transform.WorldMatrix.TranslationVector + Vector3.UnitY * FpsTargetHeight;
+                    }
+                    else // TPS
+                    {
+                        // For TPS, the "head" or pivot point might be what we want to aim from, or camera position itself.
+                        // Let's use the camera's current position as the reference for looking at the target's lock-on point.
+                        // This creates a smoother follow cam rather than a rigid look-at from player model.
+                        // Alternatively, use playerWorldPosition + Vector3.UnitY * DefaultTpsHeightOffset;
+                        playerReferencePosition = Entity.Transform.Position; 
+                    }
+
+                    Vector3 directionToTarget = targetLockOnPoint - playerReferencePosition;
+                    if (directionToTarget.LengthSquared() > MathUtil.ZeroTolerance)
+                    {
+                        directionToTarget.Normalize();
+                        // Calculate yaw: angle around Y axis. Atan2 takes (x, z) or (z, x) depending on convention.
+                        // Stride's forward is -Z. A common Atan2 usage for yaw from a direction vector (dx, dy, dz) is Atan2(dx, dz).
+                        // If our camera's "0 yaw" faces -Z, then:
+                        yaw = (float)Math.Atan2(directionToTarget.X, directionToTarget.Z); // This will make camera face target directly.
+                        // Player input for yaw should ideally be for orbiting, not overriding this.
+                        // For pitch:
+                        pitch = (float)Math.Asin(-directionToTarget.Y); // Y is up, so -Y for standard pitch calculation from direction vector.
+                    }
+                }
+                // Player input for camera movement (currentCameraInputDelta) will still be applied after this, allowing orbit/offset.
+                // For a stricter lock, disable or modify input application here.
+            }
+            
+            // Receive camera input delta from PlayerInput event IF NOT STRICTLY LOCKED or for orbit
+            // If strictly locked, we might want to ignore currentCameraInputDelta or use it for orbiting.
+            // For now, input is still processed.
             if (cameraDirectionEventListener != null && cameraDirectionEventListener.TryReceive(out var newCameraInput))
             {
                 currentCameraInputDelta = newCameraInput;
             }
 
-            // Apply sensitivity (assuming PlayerInput sends raw/normalized delta, and this script scales it)
-            // PlayerInput.cs (from previous task) scales mouse delta by (MouseSensitivity / 1000.0f)
-            // and gamepad delta by DeltaTime.
-            // So, CameraDirectionEventKey effectively carries already-scaled rotation values.
-            // The CameraSensitivity here should ideally be 1.0f if PlayerInput handles all scaling.
-            // If PlayerInput.MouseSensitivity is e.g. 100, and here CameraSensitivity is 20, the net effect is 2000x.
-            // For now, assuming PlayerInput's CameraDirectionEventKey provides the final intended rotation delta.
-            yaw -= currentCameraInputDelta.X * CameraSensitivity; 
-            pitch -= currentCameraInputDelta.Y * CameraSensitivity; 
-            currentCameraInputDelta = Vector2.Zero; // Reset after use for this frame
+            // Apply sensitivity only if there's input to apply (and potentially not fully locked)
+            if (currentCameraInputDelta.LengthSquared() > MathUtil.ZeroTolerance)
+            {
+                 // If locked on, player input could be used for orbiting adjustments rather than direct override.
+                 // For now, it adds to the yaw/pitch calculated by lock-on.
+                yaw -= currentCameraInputDelta.X * CameraSensitivity; 
+                pitch -= currentCameraInputDelta.Y * CameraSensitivity; 
+                currentCameraInputDelta = Vector2.Zero; // Reset after use for this frame
+            }
+
 
             // Clamp pitch
             pitch = MathUtil.Clamp(pitch, MathUtil.DegreesToRadians(RotationXMin), MathUtil.DegreesToRadians(RotationXMax));
 
-            // Player orientation (only yaw, pitch is for camera only)
-            // The Player entity itself should only rotate around the Y axis (yaw).
-            Player.Transform.Rotation = Quaternion.RotationY(yaw);
+            // Player entity's rotation (yaw) should be controlled by PlayerController when locked on.
+            // If not locked on, PlayerCamera controls Player's yaw.
+            if (playerControllerRef == null || !playerControllerRef.IsLockedOn)
+            {
+                Player.Transform.Rotation = Quaternion.RotationY(yaw);
+            }
+            // Else, PlayerController handles Player.Transform.Rotation to face the target.
 
-            // Camera's local rotation (pitch) relative to the player's yaw.
-            // The camera entity (Entity) is a child of Player, so its world rotation will be Player's world rotation * local camera rotation.
-            // However, this script is attached to the Camera Entity itself, which might not be a child of Player yet
-            // as per BasicScene.sdscene structure. The scene setup in step 3 will make Camera a child of Player.
-            // For FPS, camera is at player's head. For TPS, it's offset.
-            // The camera entity's rotation should be the full yaw and pitch.
+            // Camera entity's rotation (yaw and pitch)
             Entity.Transform.Rotation = Quaternion.RotationY(yaw) * Quaternion.RotationX(pitch);
 
 
@@ -236,18 +288,47 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
                 cameraTargetPosition = playerWorldPosition + Vector3.UnitY * DefaultTpsHeightOffset;
                 
                 // Offset direction is based on the camera's current full rotation (yaw and pitch)
-                Vector3 offsetDirection = Vector3.Transform(-Vector3.UnitZ, Entity.Transform.Rotation);
+                // Matrix rotationMatrix = Matrix.RotationYawPitchRoll(yaw, pitch, 0); // Using Entity.Transform.Rotation is also fine
+                // Vector3 offsetDirection = Vector3.TransformNormal(-Vector3.UnitZ, rotationMatrix);
+                Vector3 offsetDirection = Vector3.TransformNormal(-Vector3.UnitZ, Entity.Transform.Rotation); // Entity.Transform.Rotation is already yaw*pitch
+
                 desiredCameraPosition = cameraTargetPosition + offsetDirection * DefaultTpsDistance;
 
                 // Basic Collision Detection
                 var raycastStart = cameraTargetPosition;
-                var raycastEnd = desiredCameraPosition;
-                var hitResult = simulation.Raycast(raycastStart, raycastEnd, CollisionFilterGroups.DefaultFilter, CollisionFilterGroupFlags.DefaultFilter); // Specify filter groups
+                var characterComponent = Player?.Get<CharacterComponent>(); // Get character component of the parent
+
+                // Use a slightly smaller ray for collision to avoid starting inside geometry if player is too close to a wall
+                var rayDirection = desiredCameraPosition - raycastStart;
+                var rayLength = rayDirection.Length();
+                if (rayLength > MathUtil.ZeroTolerance) // Ensure rayDirection is not zero
+                {
+                    rayDirection.Normalize();
+                }
+                
+                // Perform raycast from a point slightly in front of the target towards the desired camera position
+                var raycastActualStart = raycastStart; // + offsetDirection * 0.1f; // Optional: start ray slightly away from pivot
+
+                HitResult hitResult;
+                // Only cast if ray is not too short
+                if (rayLength > TpsCollisionMargin) 
+                {
+                     hitResult = simulation.Raycast(raycastActualStart, desiredCameraPosition,
+                        characterComponent != null ? new[] { characterComponent } : null, // Exclude player's character collider
+                        CollisionFilterGroups.Default, // Collide with default group
+                        CollisionFilterGroupFlags.Default); // Collide with default group flags
+                }
+                else
+                {
+                    hitResult = new HitResult { Succeeded = false }; // Treat very short rays as no hit to prevent issues
+                }
+
 
                 if (hitResult.Succeeded)
                 {
-                    // Move camera to hit point, plus a margin so it doesn't clip into the geometry
-                    desiredCameraPosition = hitResult.Point + (raycastStart - raycastEnd).Normalized() * TpsCollisionMargin;
+                    // Move camera to hit point, plus a small margin so it doesn't clip into the geometry
+                    // The offsetDirection is from camera to target, so we use -offsetDirection to push away from wall
+                    desiredCameraPosition = hitResult.Point - offsetDirection * TpsCollisionMargin; // Use the defined margin
                 }
                 Entity.Transform.Position = desiredCameraPosition;
                 Entity.Transform.Rotation = Quaternion.RotationY(yaw) * Quaternion.RotationX(pitch);
