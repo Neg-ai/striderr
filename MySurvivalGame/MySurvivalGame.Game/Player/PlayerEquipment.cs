@@ -19,6 +19,12 @@ namespace MySurvivalGame.Game.Player
         public BaseWeapon CurrentWeapon { get; private set; }
         private int equippedSlotIndex = -1; 
         private PlayerInventoryComponent playerInventory;
+        private PlayerStaminaComponent playerStamina; // ADDED
+
+        // Stamina Costs
+        private const float PrimaryActionStaminaCost = 15f;
+        private const float SecondaryActionStaminaCost = 25f;
+        private const float ResourceGatherStaminaCost = 10f; // ADDED for consistency with actions
 
         // TODO: Populate this map with ItemID -> ScriptType mappings
         private Dictionary<string, Type> itemScriptMap = new Dictionary<string, Type>(); 
@@ -39,6 +45,13 @@ namespace MySurvivalGame.Game.Player
                 Log.Error("PlayerEquipment: PlayerInventoryComponent not found on the entity.");
                 // Potentially disable this component or throw an error
                 return;
+            }
+
+            playerStamina = Entity.Get<PlayerStaminaComponent>(); // ADDED
+            if (playerStamina == null)
+            {
+                Log.Error("PlayerEquipment: PlayerStaminaComponent not found on the entity.");
+                // This could be critical, consider disabling equipment if no stamina component
             }
 
             // Example mapping - this would ideally be data-driven or more robust
@@ -183,19 +196,33 @@ namespace MySurvivalGame.Game.Player
                 return; 
             }
 
+            // Stamina Check for SecondaryAction
+            if (playerStamina == null)
+            {
+                Log.Warning("PlayerEquipment: No PlayerStaminaComponent, cannot consume stamina for SecondaryAction.");
+            }
+            else if (!playerStamina.TryConsumeStamina(SecondaryActionStaminaCost))
+            {
+                Log.Info($"PlayerEquipment: Not enough stamina for SecondaryAction. Need: {SecondaryActionStaminaCost}, Have: {playerStamina.CurrentStamina}");
+                // GameSoundManager.PlaySound("Player_OutOfStamina", this.Entity.Transform.WorldMatrix.TranslationVector); // Assuming this sound exists
+                return; // Do not proceed
+            }
+
             if (CurrentWeapon != null)
             {
                 Log.Info($"PlayerEquipment: Performing SecondaryAction for '{stack.Item.ItemName}' using script {CurrentWeapon.GetType().Name}. Durability before: {stack.CurrentDurability}");
                 CurrentWeapon.SecondaryAction(); // Delegate to the weapon script
                 
-                // Durability consumption for secondary action
-                float durabilityCost = 0.5f; // Example cost, can be different from primary
+                float durabilityCost = 0.5f; 
                 playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
             }
             else
             {
                 Log.Warning($"PlayerEquipment: Item '{stack.Item.ItemName}' is a weapon/tool but has no active script (CurrentWeapon is null). Secondary action not performed by script.");
-                // Fallback or generic action if any? For now, just consume durability if it's a generic tool action.
+                // If no specific script, but it's a tool/weapon, still consume durability if action implies use.
+                // For now, if CurrentWeapon is null, we assume the action didn't happen in a script-defined way.
+                // However, stamina was already consumed. If the action *can* happen without a script, durability should also be consumed.
+                // To be consistent: if stamina is consumed, durability should be too, IF the item type implies it.
                 // float durabilityCost = 0.5f;
                 // playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
             }
@@ -261,24 +288,54 @@ namespace MySurvivalGame.Game.Player
             if (stack.CurrentDurability <= 0)
             {
                 Log.Info($"PlayerEquipment: Item '{stack.Item.ItemName}' is broken! Durability: {stack.CurrentDurability}");
-                // Optionally play a "broken tool/weapon" sound or visual feedback
                 return; 
             }
 
+            // Stamina Check for PrimaryAction
+            if (playerStamina == null)
+            {
+                Log.Warning("PlayerEquipment: No PlayerStaminaComponent, cannot consume stamina for PrimaryAction.");
+            }
+            else if (!playerStamina.TryConsumeStamina(PrimaryActionStaminaCost))
+            {
+                Log.Info($"PlayerEquipment: Not enough stamina for PrimaryAction. Need: {PrimaryActionStaminaCost}, Have: {playerStamina.CurrentStamina}");
+                // GameSoundManager.PlaySound("Player_OutOfStamina", this.Entity.Transform.WorldMatrix.TranslationVector); 
+                return; // Do not proceed
+            }
+
+            // If item is a consumable, PlayerEquipment.PrimaryAction will handle it
+            if (stack.Item.Type == ItemType.Consumable)
+            {
+                Log.Info($"PlayerEquipment: Attempting to consume item '{stack.Item.ItemName}' from slot {equippedSlotIndex}.");
+                if (playerInventory.ConsumeItemBySlot(equippedSlotIndex, 1)) // Consume 1
+                {
+                    Log.Info($"PlayerEquipment: Successfully consumed '{stack.Item.ItemName}'.");
+                    // Item is consumed, potentially unequip or clear slot if it was the last one
+                    if (playerInventory.GetItemStack(equippedSlotIndex) == null)
+                    {
+                        UnequipCurrentWeapon(); // If the stack is gone, unequip.
+                    }
+                }
+                else
+                {
+                    Log.Warning($"PlayerEquipment: Failed to consume '{stack.Item.ItemName}'.");
+                }
+                return; // Consumable action ends here
+            }
+
+
             if (CurrentWeapon != null)
             {
-                Log.Info($"PlayerEquipment: Performing PrimaryAction for '{stack.Item.ItemName}' using script {CurrentWeapon.GetType().Name}. Durability before: {stack.CurrentDurability}");
-                CurrentWeapon.PrimaryAction(); // Delegate to the weapon script
+                Log.Info($"PlayerEquipment: Performing PrimaryAction for '{stack.Item.ItemName}' (Weapon/Tool) using script {CurrentWeapon.GetType().Name}. Durability before: {stack.CurrentDurability}");
+                CurrentWeapon.PrimaryAction(); 
                 
-                // Durability consumption
-                float durabilityCost = 1.0f; // Example cost, can be action/item specific
+                float durabilityCost = 1.0f; 
                 playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
-                // Log.Info($"PlayerEquipment: Durability after action for '{stack.Item.ItemName}': {playerInventory.GetItemStack(equippedSlotIndex)?.CurrentDurability}");
             }
             else
             {
-                Log.Warning($"PlayerEquipment: Item '{stack.Item.ItemName}' is a weapon/tool but has no active script (CurrentWeapon is null). Primary action not performed by script.");
-                // Fallback or generic action if any? For now, just consume durability.
+                Log.Warning($"PlayerEquipment: Item '{stack.Item.ItemName}' is a Weapon/Tool but has no active script. Primary action not performed by script, but stamina & durability consumed if applicable.");
+                // For generic tools/weapons without specific scripts, still consume durability if action implies use
                 float durabilityCost = 1.0f;
                 playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
             }
@@ -319,6 +376,18 @@ namespace MySurvivalGame.Game.Player
             {
                 Log.Info($"PlayerEquipment: Tool '{currentToolStack.Item.ItemName}' is broken! Cannot gather.");
                 return;
+            }
+
+            // Stamina Check for Resource Gathering
+            if (playerStamina == null)
+            {
+                Log.Warning("PlayerEquipment: No PlayerStaminaComponent, cannot consume stamina for resource gathering.");
+            }
+            else if (!playerStamina.TryConsumeStamina(ResourceGatherStaminaCost))
+            {
+                Log.Info($"PlayerEquipment: Not enough stamina for resource gathering. Need: {ResourceGatherStaminaCost}, Have: {playerStamina.CurrentStamina}");
+                // GameSoundManager.PlaySound("Player_OutOfStamina", this.Entity.Transform.WorldMatrix.TranslationVector);
+                return; // Do not proceed
             }
 
             var playerInput = this.Entity.Get<PlayerInput>();

@@ -25,11 +25,13 @@ namespace MySurvivalGame.Game.UI.Scripts
         private StackPanel hotbarPanel;
         private TextBlock healthText; 
         private TextBlock weightText; 
+        private ProgressBar staminaBar; // ADDED: For stamina display
         
         private List<ItemSlotScript> inventorySlotScripts = new List<ItemSlotScript>(); 
         private List<ItemSlotScript> hotbarSlotScripts = new List<ItemSlotScript>();    
         private PlayerInventoryComponent playerInventory; 
         private PlayerHotbarManager playerHotbarManager;
+        private PlayerStaminaComponent playerStamina; // ADDED: For stamina data
 
         // Drag Operation
         private ImageElement dragVisual;
@@ -62,11 +64,26 @@ namespace MySurvivalGame.Game.UI.Scripts
             hotbarPanel = rootElement.FindName<StackPanel>("HotbarPanel");
             
             var playerStatsPanel = rootElement.FindName<StackPanel>("PlayerStatsPanel");
-            if (playerStatsPanel != null && playerStatsPanel.Children.Count >= 2)
+            if (playerStatsPanel != null)
             {
-                healthText = playerStatsPanel.Children[0] as TextBlock;
-                weightText = playerStatsPanel.Children[1] as TextBlock;
+                // Assuming Health is child 0, Weight is child 1. StaminaBar needs a name or specific index.
+                if (playerStatsPanel.Children.Count >= 2) 
+                {
+                    healthText = playerStatsPanel.Children[0] as TextBlock;
+                    weightText = playerStatsPanel.Children[1] as TextBlock;
+                }
+                // Find StaminaBar by name (preferred) or index (fallback)
+                staminaBar = playerStatsPanel.FindName<ProgressBar>("StaminaBar");
+                if (staminaBar == null && playerStatsPanel.Children.Count >= 3) // Fallback if not named and order is known
+                {
+                    staminaBar = playerStatsPanel.Children[2] as ProgressBar;
+                }
+                if (staminaBar == null)
+                {
+                    Log.Warning("InventoryPanelScript: StaminaBar ProgressBar not found in PlayerStatsPanel. Stamina UI will not update.");
+                }
             }
+            else { Log.Warning("InventoryPanelScript: PlayerStatsPanel not found."); }
             
             if (ItemSlotPrefab == null) { Log.Error("InventoryPanelScript: ItemSlotPrefab is not assigned."); return; }
             if (inventoryGrid == null) { Log.Error("InventoryPanelScript: InventoryGrid not found."); }
@@ -100,6 +117,20 @@ namespace MySurvivalGame.Game.UI.Scripts
 
                 playerHotbarManager = playerEntity.Get<PlayerHotbarManager>();
                 if (playerHotbarManager == null) { Log.Error("InventoryPanelScript: PlayerHotbarManager not found on Player entity."); }
+
+                // ADDED: Get PlayerStaminaComponent and subscribe to its event
+                playerStamina = playerEntity.Get<PlayerStaminaComponent>();
+                if (playerStamina != null && staminaBar != null)
+                {
+                    playerStamina.OnStaminaChanged += UpdateStaminaUI;
+                    UpdateStaminaUI(playerStamina.CurrentStamina, playerStamina.MaxStamina); // Initialize UI
+                    Log.Info("InventoryPanelScript: Successfully subscribed to PlayerStamina.OnStaminaChanged.");
+                }
+                else if (staminaBar != null) // staminaBar exists but component doesn't
+                {
+                    Log.Warning("InventoryPanelScript: PlayerStaminaComponent not found on Player entity. Stamina UI will not be linked.");
+                    staminaBar.Visibility = Visibility.Collapsed; // Hide if no data source
+                }
             }
             else { Log.Error("InventoryPanelScript: Player entity not found. Cannot link components."); }
             
@@ -442,7 +473,30 @@ namespace MySurvivalGame.Game.UI.Scripts
             {
                 playerInventory.OnInventoryChanged -= RefreshInventoryDisplay;
             }
+            // ADDED: Unsubscribe from PlayerStaminaComponent event
+            if (playerStamina != null && staminaBar != null) 
+            {
+                playerStamina.OnStaminaChanged -= UpdateStaminaUI;
+            }
             base.Cancel();
+        }
+
+        private void UpdateStaminaUI(float currentStamina, float maxStamina)
+        {
+            if (staminaBar != null)
+            {
+                if (maxStamina > 0)
+                {
+                    staminaBar.Value = currentStamina / maxStamina; // ProgressBar Value is 0 to 1
+                    staminaBar.Visibility = Visibility.Visible; 
+                }
+                else 
+                {
+                    staminaBar.Value = 0;
+                    staminaBar.Visibility = Visibility.Collapsed;
+                }
+                // Log.Info($"Stamina UI Updated: {currentStamina}/{maxStamina}"); // Can be spammy
+            }
         }
     }
 }

@@ -149,7 +149,7 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
     *   Basic player entity, movement, camera (FPS/TPS).
     *   Stride scene setup, basic lighting.
 2.  **Phase 2: Core Survival Mechanics**
-    *   Health, hunger, thirst, stamina.
+    *   Core player stats: Health (basic damage/death system implemented), Stamina (core consumption/regeneration system implemented), Hunger (pending), Thirst (pending).
     *   Basic inventory and item pickup.
     *   Day/night cycle.
     *   **Sound Note:** Weapon and tool implementation in this phase must consider a detailed list of sound event categories: Equip, Unequip, Idle handling, Attack, Impact (varied by surface), Miss, Durability break, Reload, Ammo insert/remove, and Special actions.
