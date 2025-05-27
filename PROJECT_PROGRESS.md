@@ -77,7 +77,7 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
         *   AnimationComponent (linked to Animation Merging system)
         *   NetworkSyncComponent
         *   InputComponent
-            *   Note: Input handling will need to support a toggle for switching between standard melee and Souls-like melee modes.
+            *   Note: Input handling must support a **high-priority** toggle for switching between standard 'Ark-like' melee and 'Souls-like' precision melee modes.
     *   **NPC/Creature Entities**
         *   AIControllerComponent (Pathfinding, Behavior Trees)
         *   StatsComponent
@@ -152,11 +152,15 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
     *   Health, hunger, thirst, stamina.
     *   Basic inventory and item pickup.
     *   Day/night cycle.
-    *   **Sound Note:** Weapon and tool implementation in this phase must consider a detailed list of sound event categories: Equip, Unequip, Idle handling, Attack, Impact (varied by surface), Miss, Durability break, Reload, Ammo insert/remove, and Special actions.
-3.  **Phase 3: Combat System - Melee Focus**
+    *   **Sound Note:** Weapon and tool implementation in this phase must consider a detailed list of sound event categories (see Appendix E for full details).
+3.  **Phase 3: Combat Systems**
     *   Souls-like combat mechanics (stamina, lock-on, basic attacks, dodge).
     *   Hitbox system and damage application.
     *   Basic enemy AI (placeholder).
+    *   **TASK-002-A: Implement Basic Melee Weapons and Tools (Pick, Hatchet):** (Prompt for this task would detail initial weapon/tool setup, linking to `PlayerEquipment`, basic attack animations, and resource gathering interaction. Placeholder for now.)
+    *   **TASK-002-B: Add ranged, explosive, and special weapons {ESTIMATE:24h}**
+        *   **Prompt:**
+            > Extend the weapon system to include bows (multiple arrow types), firearms, explosives, and special weapons (plasma, railgun). Each should have distinct sound effects and visual feedback. Bullet mechanics: Bullets from firearms should travel in a straight line (hitscan or very fast projectile). Projectiles from bows, rocket launchers, and grenade launchers should be affected by gravity. **Note: Ranged combat (including firearms, bows, etc.) is a high priority, on par with Souls-like melee mechanics.**
 4.  **Phase 4: Animation & Physics**
     *   Character animation integration (Mixamo).
     *   Animation merging system development.
@@ -166,16 +170,21 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
     *   Security Camera system.
     *   Screaming NPC implementation.
     *   Tribe Log system.
-6.  **Phase 6: Networking & Multiplayer**
+6.  **Phase 6: Vehicles & Scouting Tools** {DURATION:2w}
+    *   Description: This phase focuses on implementing various means of transportation and reconnaissance for the player.
+    *   **TASK-006-A: Add boats, spyglass, binoculars, scouting drone {ESTIMATE:24h}**
+        *   **Prompt:**
+            > Implement controllable boats, handheld spyglass, binoculars, and a deployable scouting drone with remote camera and minimap integration.
+7.  **Phase 7: Networking & Multiplayer**
     *   Basic multiplayer synchronization (player movement, actions).
     *   PvP/PvE mode distinction.
     *   Networked interactions for core features.
-7.  **Phase 7: World & Content**
+8.  **Phase 8: World & Content**
     *   Basic procedural world generation or manual level design tools.
     *   More diverse NPCs and creatures.
     *   Sound design and VFX polish.
-    *   **Sound Note:** Sound system expansion in this phase should revisit and enhance initial weapon/tool sounds (Equip, Unequip, Idle, Attack, Impact, Miss, Durability break, Reload, Ammo actions, Special) and add environmental and character sounds.
-8.  **Phase 8: Testing, Optimization & Refinement**
+    *   **Sound Note:** Sound system expansion in this phase should revisit and enhance initial weapon/tool sounds, ensuring they align with the detailed categories in Appendix E, and also add comprehensive environmental and character sounds.
+9.  **Phase 9: Testing, Optimization & Refinement**
     *   Comprehensive testing.
     *   Performance profiling and optimization.
     *   Bug fixing and polish.
@@ -189,7 +198,7 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
     *   **Input Remapping Clarification:** The initial setup will utilize the template's approach for input handling (e.g., hardcoded key lists or simple mapping in `PlayerInput.cs`). Full UI-driven input remapping is a more extensive feature planned for `TASK-004-C`.
     *   **PvP/PvE Design Consideration:** Develop the player controller with an awareness of future PvP and PvE mode distinctions. Consider how systems like targeting, damage application, or ability usage might need to differ or be configurable based on the game mode.
     *   **NPC Alert System Note:** Player actions (e.g., making noise, being detected) will eventually need to interface with an NPC alert system. This is for future integration and not part of this immediate task, but the player controller should be extensible enough to support such interactions.
-    *   **Dual Melee Mode Toggle:** The player controller must support a toggleable melee mode system (standard vs. Souls-like). Input for this toggle should be considered.
+    *   **High Priority - Dual Melee Mode Toggle:** The player controller must implement a critical, toggleable melee mode system, allowing switching between standard 'Ark-like' melee mechanics and 'Souls-like' precision melee. Input for this toggle is a key consideration for this task.
     *   **Souls-like Melee Mechanics Investigation Findings & Design Outline:**
         *   **I. Lock-On System:**
             *   **Target Acquisition:**
@@ -235,23 +244,16 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
     *   **Hotbar Functionality:** Implement a hotbar UI that allows quick access to a limited number of items, primarily weapons, tools, and potentially consumables. This will involve linking inventory slots to hotbar slots and handling input for selecting/using items from the hotbar. Consider adapting or creating an equipment manager (potentially inspired by `PlayerEquipment.cs` from templates) to handle equipping/unequipping items reflected in the hotbar.
     *   **Tribe Log Interaction Note:** Certain inventory events, such_as dropping high-value items, crafting rare gear, or using specific quest-related items, may eventually need to be recorded by the Tribe Log system. This is for future integration.
     *   **Security Camera System Note:** The inventory system must be designed to handle special items like 'Security Camera' deployables or tools related to viewing camera feeds. This is for future integration.
-*   **[TASK-002-A] Implement Basic Melee Weapons and Tools (Pick, Hatchet):** (Prompt for this task would detail initial weapon/tool setup, linking to `PlayerEquipment`, basic attack animations, and resource gathering interaction. Placeholder for now.)
-*   **[TASK-002-B] Add ranged, explosive, and special weapons {ESTIMATE:24h}**
-    *   **Prompt:**
-        > Extend the weapon system to include bows (multiple arrow types), firearms, explosives, and special weapons (plasma, railgun). Each should have distinct sound effects and visual feedback.
 *   **Task Example (Phase 3):** "Implement a lock-on targeting system for the CombatComponent. When a button is pressed, the player should target the nearest enemy within a specified range and cone of view. The camera should smoothly adjust to keep both player and target in frame."
 *   **Task Example (Phase 4):** "Develop a script to manage ragdoll physics for character entities. On death, the character's kinematic animation should be replaced by a physics-driven ragdoll. Implement a basic area-based damage system where hits to specific ragdoll bones (e.g., head) apply damage multipliers."
 *   **Task Example (Phase 5):** "Create the Screaming NPC. It needs a detection component (cone of vision, range) to spot players or hostile NPCs. Upon detection, it should play a 'scream' sound effect and trigger an event that other nearby friendly NPCs can subscribe to."
-*   **[TASK-006-A] Add boats, spyglass, binoculars, scouting drone {ESTIMATE:24h}**
-    *   **Prompt:**
-        > Implement controllable boats, handheld spyglass, binoculars, and a deployable scouting drone with remote camera and minimap integration.
 
 ### 4.3. Implementation Order Diagram Description
 *(A conceptual diagram would be inserted here. For text, it's described.)*
 
 The implementation order will generally follow the phases. Core systems are built first, followed by gameplay mechanics layered on top. Networking will be integrated iteratively with features once they are stable in single-player. Animation and physics enhancements will be developed in parallel once the basic character controller is ready.
 
-`[Core Setup] -> [Survival Mechanics] -> [Combat Basics] -> [Animation/Physics] -> [Advanced Gameplay] -> [Networking] -> [World/Content] -> [Testing/Polish]`
+`[Core Setup] -> [Survival Mechanics] -> [Combat Basics] -> [Animation/Physics] -> [Advanced Gameplay] -> [Vehicles & Scouting Tools] -> [Networking] -> [World/Content] -> [Testing/Polish]`
 
 Dependencies:
 *   Combat depends on Player Mechanics.
@@ -285,15 +287,19 @@ Dependencies:
 | Pick                 | 15     | 0.5/s     | Melee | Mining bonus    |
 | Hatchet              | 20     | 0.6/s     | Melee | Wood bonus      |
 | Mining Drill         | 10     | 1.5/s     | Melee | Area mining     |
-| Bow                  | 40     | 1/s       | 50m   | Arrow drop      |
-| Pistol               | 30     | 2/s       | 70m   | Moderate recoil |
-| Shotgun              | 10x10  | 1/s       | 20m   | Spread          |
-| Assault Rifle        | 25     | 10/s      | 100m  | Auto/Burst      |
-| Sniper Rifle         | 100    | 0.5/s     | 300m  | Scope           |
-| Grenade              | 150    | N/A       | 20m   | Thrown, AoE     |
+| Revolver             | 45     | 0.8/s     | 30m   | High recoil     |
+| Modern Pistol        | 35     | 2.0/s     | 25m   | Fast reload     |
+| Bolt Sniper          | 90     | 0.5/s     | 150m  | High accuracy   |
+| Semi-auto Sniper     | 70     | 1.0/s     | 100m  |                 |
+| Assault Rifle        | 30     | 8.0/s     | 60m   | Full-auto       |
+| Double Barrel Shotgun| 60x2   | 0.5/s     | 10m   | Wide spread     |
+| Shotgun              | 40     | 1.2/s     | 15m   |                 |
+| Plasma Rifle         | 15     | 5.0/s     | 50m   | AOE, shield dmg |
+| Rail Gun             | 120    | 0.2/s     | 200m  | Piercing        |
+| Grenade Launcher     | 100    | 0.8/s     | 40m   | Explosive       |
+| Grenade              | 120    | -         | 15m   | Throwable       |
+| C4                   | 300    | -         | -     | Timed/detonator |
 | Rocket Launcher      | 250    | 0.5/s     | 60m   | Splash damage   |
-| Plasma Rifle         | 35     | 8/s       | 80m   | Energy damage   |
-| Railgun              | 200    | 0.2/s     | 500m  | Penetration     |
 
 ---
 
@@ -301,10 +307,10 @@ Dependencies:
 | Material     | HP    | Weakness           | Strength                |
 |--------------|-------|--------------------|-------------------------|
 | Thatch       | 200   | Fire, rain         | Cheap, fast to build    |
-| Wood         | 1000  | Fire, explosives   | Moderate cost/time      |
-| Stone        | 5000  | Explosives, siege  | High melee resist       |
-| Metal        | 10000 | Explosives         | High overall resist     |
-| Reinforced   | 20000 | Heavy explosives   | Highest resist          |
+| Wood         | 400   | Fire, axes         | Easy to upgrade         |
+| Stone        | 800   | Explosives         | Weatherproof            |
+| Metal        | 2000  | Plasma, C4         | Conducts electricity    |
+| Advanced     | 4000  | Plasma, rockets    | Immune to small arms    |
 | Glass        | 600   | Melee, explosives  | Greenhouse effect       |
 
 ---
@@ -313,9 +319,12 @@ Dependencies:
 | Defense Type       | Damage/Effect    | Power Use | Special                      |
 |--------------------|------------------|-----------|------------------------------|
 | Spike Wall         | 40/sec contact   | 0         | Bleed effect                 |
-| Auto Turret        | 30/shot          | 10/min    | Needs ammo, targets hostiles |
-| Laser Turret       | 50/shot          | 20/min    | High accuracy, energy        |
-| Electric Fence     | Stun/10dmg       | 5/min     | Stuns targets                |
+| Bear Trap          | Immobilize 10s   | 0         | Single-use                   |
+| Turret (Rifle)     | 50/shot          | 5/min     | Ammo required                |
+| Heavy Turret       | 80/shot          | 10/min    | Armor-piercing               |
+| Plasma Turret      | 30/shot (AOE)    | 15/min    | Ignores shields              |
+| Flame Turret       | 20/sec (burn)    | 8/min     | Area denial                  |
+| Tesla Coil         | 80 (shock)       | 20/min    | Chain to 3 targets           |
 | Force Field        | Blocks all but C4| 50/min    | Only explosive/plasma damage |
 
 ---
@@ -324,12 +333,34 @@ Dependencies:
 | Device             | Power Use | Range/Capacity | Notes                       |
 |--------------------|-----------|----------------|-----------------------------|
 | Gas Generator      | 20/min    | 50m cable      | Needs fuel                  |
-| Wind Turbine       | 0-15/min  | 30m cable      | Wind dependent              |
-| Solar Panel        | 0-10/min  | 30m cable      | Sun dependent               |
-| Battery            | Input/Output | 1000 capacity | Stores power                |
-| Water Reservoir    | 0         | 500 units      | Collects rain               |
-| Irrigation Pipe    | 0         | Connects       | Transports water            |
+| Field Generator    | 40/min    | 30m radius     | Wireless power              |
+| Battery            | -         | 1000 units     | Stores excess power         |
+| Pump               | 10/min    | 100m pipe      | Moves water uphill          |
+| Reservoir          | -         | 2000L          | Stores water                |
 | Sprinkler          | 2/min     | 8m radius      | Irrigates crops             |
+
+---
+
+### E. Sound Event Categories
+The following list details the specific sound event categories to be implemented for weapons, tools, and other relevant game interactions:
+
+*   **Equip:** Sound for drawing or readying an item (e.g., weapon draw, tool equip).
+*   **Unequip:** Sound for holstering or putting away an item.
+*   **Idle Handling:** Subtle sounds produced by the item while held or worn, reflecting its material and player movement (e.g., cloth rustle, metal jingle, wooden creaks).
+*   **Attack:** Sound produced when initiating an item's primary action (e.g., sword swing, gun fire, axe chop, tool use).
+*   **Impact:** Sounds produced when an attack or action successfully hits a target. These should vary based on the target material:
+    *   Flesh (e.g., creature, player)
+    *   Wood (e.g., trees, wooden structures)
+    *   Stone (e.g., rocks, stone structures)
+    *   Metal (e.g., metal structures, armor)
+    *   Glass (e.g., windows, bottles)
+    *   Ground (e.g., dirt, sand, grass)
+    *   Water
+*   **Miss:** Sound produced when an attack or action fails to hit a target (e.g., sword woosh, bullet flying past).
+*   **Durability Break:** A distinct sound effect indicating that a tool or weapon has broken due to low durability.
+*   **Reload:** Sounds associated with reloading a weapon (if applicable, e.g., magazine out, magazine in, bolt cycle).
+*   **Ammo Insert/Remove:** Sounds for actions like chambering a round, inserting individual shells, or removing ammo (if distinct from full reload).
+*   **Special:** Unique sounds for an item's special abilities or actions (e.g., weapon charge-up, priming a grenade, detonator click, special attack activation).
 
 ---
 
@@ -359,8 +390,10 @@ The following additional features and considerations were requested by the user 
 ## 8. GENERAL TECHNICAL NOTES & WORKFLOW
 
 *   **Stride Version:** All development must be compatible with Stride 4.2.0.2381.
+*   **Stride3D Documentation and Resources:** All development should actively cross-reference the official Stride3D documentation (API reference, manual, troubleshooting pages) and utilize the official Stride3D samples for usage examples and best practices to ensure error-free and proper implementation of intended features.
 *   **Project Files:** The solution (`.sln`) and project (`.csproj`, `.sdpkg`) files must be kept up-to-date as new files and dependencies are added.
 *   **Source Control Workflow ("Auto Publish"):** The AI (Jules) will create commits and branches for features/fixes. The user will be responsible for reviewing and pushing these to the remote GitHub repository.
+*   **Commit and Progress Update Protocol:** When committing changes, the commit message must be the name of the completed task from this `PROJECT_PROGRESS.md` file. The final action before any commit must be to update this `PROJECT_PROGRESS.md` file to reflect the current status of tasks.
 *   **Task Batching ("8 tasks"):** This is a general guideline for the AI to structure its work into manageable chunks. The AI will aim to complete roughly 8 plan steps or a similar amount of work before requiring a major check-in or new planning phase, user feedback permitting.
 *   **Commercialization:** The project is intended for commercial release (e.g., on Steam). All code and asset usage must comply with relevant licenses (e.g., Stride's MIT license, asset store licenses).
 
