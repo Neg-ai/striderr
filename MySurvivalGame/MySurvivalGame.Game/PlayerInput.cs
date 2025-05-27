@@ -18,6 +18,15 @@ namespace MySurvivalGame.Game
 
         public static readonly EventKey<Vector2> CameraDirectionEventKey = new EventKey<Vector2>();
         public static readonly EventKey SwitchCameraModeEventKey = new EventKey(); // MODIFIED: Uncommented
+        public static readonly EventKey JumpEventKey = new EventKey(); // ADDED: For jumping
+        public static readonly EventKey LockOnToggleEventKey = new EventKey(); // ADDED: For lock-on toggle
+        public static readonly EventKey SwitchTargetLeftEventKey = new EventKey(); // ADDED: For switching target left
+        public static readonly EventKey SwitchTargetRightEventKey = new EventKey(); // ADDED: For switching target right
+        public static readonly EventKey DodgeEventKey = new EventKey(); // ADDED: For dodging
+        public static readonly EventKey LightAttackEventKey = new EventKey(); // ADDED: For light attack
+        public static readonly EventKey HeavyAttackEventKey = new EventKey(); // ADDED: For heavy attack
+        public static readonly EventKey<bool> BlockEventKey = new EventKey<bool>(); // ADDED: For blocking (true=start, false=stop)
+        public static readonly EventKey ToggleMeleeModeEventKey = new EventKey(); // ADDED: For toggling melee mode
         public static readonly EventKey<int> HotbarSlotSelectedEventKey = new EventKey<int>(); // ADDED: For hotbar selection
         public static readonly EventKey InteractEventKey = new EventKey(); // ADDED: For interaction
 
@@ -50,6 +59,15 @@ namespace MySurvivalGame.Game
         public List<Keys> KeysDown { get; set; } = new List<Keys>() { Keys.S, Keys.Down }; // MODIFIED: Uncommented
         // public List<Keys> KeysReload { get; set; } = new List<Keys>() { Keys.R };
         public List<Keys> KeysSwitchCamera { get; set; } = new List<Keys>() { Keys.T }; // MODIFIED: Uncommented
+        public List<Keys> KeysJump { get; set; } = new List<Keys>() { Keys.Space }; // ADDED: For jumping
+        public List<Keys> KeysLockOnToggle { get; set; } = new List<Keys>() { Keys.Tab }; // ADDED: For lock-on toggle
+        public List<Keys> KeysSwitchTargetLeft { get; set; } = new List<Keys>() { Keys.Q }; // ADDED: For switching target left
+        public List<Keys> KeysSwitchTargetRight { get; set; } = new List<Keys>() { Keys.E }; // ADDED: For switching target right
+        public List<Keys> KeysDodge { get; set; } = new List<Keys>() { Keys.LeftShift }; // ADDED: For dodging
+        public List<Keys> KeysLightAttack { get; set; } = new List<Keys>() { Keys.LeftMouseButton }; // ADDED: For light attack
+        public List<Keys> KeysHeavyAttack { get; set; } = new List<Keys>() { Keys.F }; // ADDED: For heavy attack
+        public List<Keys> KeysBlock { get; set; } = new List<Keys>() { Keys.RightMouseButton }; // ADDED: For blocking
+        public List<Keys> KeysToggleMeleeMode { get; set; } = new List<Keys>() { Keys.V }; // ADDED: For toggling melee mode
         // public List<Keys> KeysToggleBuildMode { get; set; } = new List<Keys>() { Keys.B };
         // public List<Keys> KeysRotateBuildLeft { get; set; } = new List<Keys>() { Keys.OemComma };
         // public List<Keys> KeysRotateBuildRight { get; set; } = new List<Keys>() { Keys.OemPeriod };
@@ -188,6 +206,82 @@ namespace MySurvivalGame.Game
             if (Input.IsKeyPressed(Keys.E))
             {
                 InteractEventKey.Broadcast();
+            }
+
+            // ADDED: Jump Input
+            if (KeysJump.Any(key => Input.IsKeyPressed(key)))
+            {
+                JumpEventKey.Broadcast();
+            }
+
+            // ADDED: Lock-On Toggle Input
+            if (KeysLockOnToggle.Any(key => Input.IsKeyPressed(key)))
+            {
+                LockOnToggleEventKey.Broadcast();
+            }
+
+            // ADDED: Target Switching Input
+            if (KeysSwitchTargetLeft.Any(key => Input.IsKeyPressed(key)))
+            {
+                SwitchTargetLeftEventKey.Broadcast();
+            }
+            if (KeysSwitchTargetRight.Any(key => Input.IsKeyPressed(key)))
+            {
+                SwitchTargetRightEventKey.Broadcast();
+            }
+
+            // ADDED: Core Combat Action Inputs
+            if (KeysDodge.Any(key => Input.IsKeyPressed(key)))
+            {
+                DodgeEventKey.Broadcast();
+            }
+
+            if (KeysLightAttack.Any(key => Input.IsMouseButtonPressed((MouseButton)key))) // Assuming LeftMouseButton is the primary key
+            {
+                LightAttackEventKey.Broadcast();
+            }
+            else if (KeysLightAttack.Any(key => Input.IsKeyPressed(key) && !Input.IsMouseButton(key))) // Fallback for non-mouse keys
+            {
+                 LightAttackEventKey.Broadcast();
+            }
+
+
+            if (KeysHeavyAttack.Any(key => Input.IsKeyPressed(key)))
+            {
+                HeavyAttackEventKey.Broadcast();
+            }
+
+            // Handle block press and release
+            foreach (var key in KeysBlock)
+            {
+                if (Input.IsMouseButton(key)) // Check if it's a mouse button
+                {
+                    if (Input.IsMouseButtonPressed((MouseButton)key))
+                    {
+                        BlockEventKey.Broadcast(true);
+                    }
+                    else if (Input.IsMouseButtonReleased((MouseButton)key))
+                    {
+                        BlockEventKey.Broadcast(false);
+                    }
+                }
+                else // It's a regular key
+                {
+                    if (Input.IsKeyPressed(key))
+                    {
+                        BlockEventKey.Broadcast(true);
+                    }
+                    else if (Input.IsKeyReleased(key))
+                    {
+                        BlockEventKey.Broadcast(false);
+                    }
+                }
+            }
+
+            // ADDED: Toggle Melee Mode Input
+            if (KeysToggleMeleeMode.Any(key => Input.IsKeyPressed(key)))
+            {
+                ToggleMeleeModeEventKey.Broadcast();
             }
         }
     }

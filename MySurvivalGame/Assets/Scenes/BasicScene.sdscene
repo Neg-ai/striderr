@@ -46,6 +46,25 @@ Entities:
         Id: 10000000-0000-0000-0001-000000000006 # New Component ID for PlayerEquipment
         ScriptType: MySurvivalGame.Game.Player.PlayerEquipment, MySurvivalGame.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
         Parameters: {} # No parameters to set for now
+      - !ScriptComponent # PlayerLockOnManager Script
+        Id: 10000000-0000-0000-0001-000000000007 # New Component ID for PlayerLockOnManager
+        ScriptType: MySurvivalGame.Game.Player.PlayerLockOnManager, MySurvivalGame.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+        Parameters:
+          PlayerCamera: !EntityReference # Link to the Camera entity's CameraComponent
+            Id: 10000000-0000-0000-0000-000000000002 # Camera Entity ID
+            ComponentName: !IdReference { Id: 10000000-0000-0000-0002-000000000002 } # CameraComponent ID on Camera Entity
+          LockOnSphereRadius: 10.0
+          MaxLockOnDistance: 20.0
+      - !ScriptComponent # PlayerAnimationController Script (Moved to Player entity)
+        Id: 10000000-0000-0000-0001-000000000008 # New Component ID for PlayerAnimationController on Player
+        ScriptType: MySurvivalGame.Game.Player.PlayerAnimationController, MySurvivalGame.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null # Updated Namespace
+        Parameters:
+          AnimComponent: !EntityReference # Link to AnimationComponent on PlayerModel
+            Id: 10000000-0000-0000-0000-000000000005 # PlayerModel Entity ID
+            ComponentName: !IdReference { Id: 10000000-0000-0000-0005-000000000002 } # AnimationComponent ID on PlayerModel
+          Character: !EntityReference # Link to CharacterComponent on this Player entity
+            Id: 10000000-0000-0000-0000-000000000001 # Player Entity ID
+            ComponentName: !IdReference { Id: 10000000-0000-0000-0001-000000000002 } # CharacterComponent ID on Player
     Children:
       - Id: 10000000-0000-0000-0000-000000000005 # PlayerModel Entity ID (formerly PlayerModelPlaceholder)
         Name: PlayerModel # MODIFIED: Renamed from PlayerModelPlaceholder
@@ -62,16 +81,6 @@ Entities:
             Animations: {} # Animations dictionary remains empty as FBX files were not found.
             BlendOperation: Additive 
             DefaultRetargeting: Root 
-          - !ScriptComponent # PlayerAnimationController Script
-            Id: 10000000-0000-0000-0005-000000000003 # New Component ID for PlayerAnimationController
-            ScriptType: MySurvivalGame.Game.PlayerAnimationController, MySurvivalGame.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
-            Parameters:
-              TargetAnimationComponent: !EntityReference # MODIFIED: Parameter name updated from AnimComponent
-                Id: 10000000-0000-0000-0000-000000000005 # PlayerModel Entity ID
-                ComponentName: !IdReference { Id: 10000000-0000-0000-0005-000000000002 } # AnimationComponent ID
-              Character: !EntityReference # Link to the CharacterComponent on the parent Player entity
-                Id: 10000000-0000-0000-0000-000000000001 # Player Entity ID
-                ComponentName: !IdReference { Id: 10000000-0000-0000-0001-000000000002 } # CharacterComponent ID
         Transform:
           Position: [0.0, 0.0, 0.0] # Position relative to Player root
           Rotation: [0.0, 0.0, 0.0, 1.0]

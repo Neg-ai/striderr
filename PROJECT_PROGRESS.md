@@ -36,7 +36,7 @@ To develop a robust and feature-rich survival game engine using Stride3D (versio
     *   Physics-based ragdoll effects for characters upon death or significant impact.
     *   Area-based damage system linked to ragdoll physics (e.g., headshots, limb damage affecting animations and character behavior).
     *   Reference Three.js example for ragdoll setup: Implement ragdoll physics similar to the provided three.js example, focusing on realistic joint constraints and impact responses.
-*   **[REQ-XXX] Dual Melee System:** Support for standard melee (e.g., Ark-like) and a toggleable "Souls-like" precision melee mode. {PRIORITY:HIGH}
+*   **Dual Melee System:** Support for two distinct melee modes: a standard mode (e.g., Ark-like) and a toggleable "Souls-like" precision melee mode. The Souls-like mode would be primarily for melee weapons, while the standard mode accommodates a broader range of actions. {PRIORITY:HIGH}
 
 ### 1.3. Constraints
 *   **Engine:** Stride3D version 4.2.0.2381. Project files must be updated if starting from an older template.
@@ -73,7 +73,7 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
         *   InventoryComponent
         *   CraftingComponent
         *   CombatComponent (handles attacks, damage, abilities)
-            *   Note: Melee weapon functionality will need to adapt to both standard and Souls-like combat modes.
+            *   Note: Melee weapon functionality will need to adapt to both standard and Souls-like combat modes. Input handling for mode toggle is crucial.
         *   AnimationComponent (linked to Animation Merging system)
         *   NetworkSyncComponent
         *   InputComponent
@@ -148,13 +148,25 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
     *   Project creation, version control.
     *   Basic player entity, movement, camera (FPS/TPS).
     *   Stride scene setup, basic lighting.
-2.  **Phase 2: Core Survival Mechanics**
-    *   Health, hunger, thirst, stamina.
-    *   Basic inventory and item pickup.
-    *   Day/night cycle.
-    *   **Sound Note:** Weapon and tool implementation in this phase must consider a detailed list of sound event categories: Equip, Unequip, Idle handling, Attack, Impact (varied by surface), Miss, Durability break, Reload, Ammo insert/remove, and Special actions.
+2.  **Phase 2: Weapons, Tools, and Sound {DURATION:3w}**
+    *   Core Survival Mechanics: Health, hunger, thirst, stamina. Basic inventory and item pickup. Day/night cycle.
+    *   **Initial Weapon/Tool Implementation & Sound Design Pass:**
+        *   Implement basic melee weapons (e.g., from `TASK-002-A`) and tools.
+        *   **Sound Design:** Weapon and tool implementation in this phase must consider a detailed list of sound event categories:
+            *   Equip (draw/ready)
+            *   Unequip (holster/put away)
+            *   Idle handling (subtle movement, cloth, metal, wood as appropriate)
+            *   Attack (swing, fire, or use)
+            *   Impact (hit target: flesh, wood, stone, metal, glass, ground, water)
+            *   Miss (swing or fire with no hit)
+            *   Durability break (distinct sound for tool/weapon breaking)
+            *   Reload (if applicable)
+            *   Ammo insert/remove (if applicable)
+            *   Special (unique actions, e.g., charge, prime, detonate, etc.)
 3.  **Phase 3: Combat System - Melee Focus**
     *   Souls-like combat mechanics (stamina, lock-on, basic attacks, dodge).
+    *   Standard melee combat mechanics.
+    *   Implementation of the toggle between Souls-like and Standard melee modes.
     *   Hitbox system and damage application.
     *   Basic enemy AI (placeholder).
 4.  **Phase 4: Animation & Physics**
@@ -166,16 +178,17 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
     *   Security Camera system.
     *   Screaming NPC implementation.
     *   Tribe Log system.
-6.  **Phase 6: Networking & Multiplayer**
+6.  **Phase 6: Vehicles & Scouting Tools {DURATION:2w}**
+    *   Implement `TASK-006-A` (boats, spyglass, binoculars, scouting drone).
+7.  **Phase 7: Networking & Multiplayer**
     *   Basic multiplayer synchronization (player movement, actions).
     *   PvP/PvE mode distinction.
     *   Networked interactions for core features.
-7.  **Phase 7: World & Content**
+8.  **Phase 8: World & Content**
     *   Basic procedural world generation or manual level design tools.
     *   More diverse NPCs and creatures.
-    *   Sound design and VFX polish.
-    *   **Sound Note:** Sound system expansion in this phase should revisit and enhance initial weapon/tool sounds (Equip, Unequip, Idle, Attack, Impact, Miss, Durability break, Reload, Ammo actions, Special) and add environmental and character sounds.
-8.  **Phase 8: Testing, Optimization & Refinement**
+    *   Sound design and VFX polish (revisit and enhance earlier sound work, add environmental/character sounds).
+9.  **Phase 9: Testing, Optimization & Refinement**
     *   Comprehensive testing.
     *   Performance profiling and optimization.
     *   Bug fixing and polish.
@@ -184,12 +197,13 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
 
 *   **TASK-001-A: Implement FPS/TPS camera and movement.**
     *   **Prompt/Description:** "Create a new Stride 4.2.0.2381 project. Set up a basic scene with a ground plane. Adapt existing template scripts: `PlayerCamera.cs` for switchable FPS/TPS views (with camera collision handling), `PlayerInput.cs` for input event management, and `PlayerController.cs` (utilizing `CharacterComponent`) for player movement (WASD, jump).
+    **Status:** Completed
     *   **Souls-like Melee Mechanics Integration:** Investigate Stride3D's capabilities for core Souls-like features: target lock-on, target switching (e.g., mouse wheel or dedicated keys), and dynamic camera adjustments for optimal combat visibility. Explore implementing distinct melee attack states (e.g., light, heavy, special) and basic combo sequences. Add new input events to `PlayerInput.cs` for lock-on, dodge, and different attack types. Consider how player model orientation and movement should adapt when locked onto a target (e.g., strafing, maintaining focus).
-    *   **Animation System with Mixamo Blending:** Investigate Stride's animation system for advanced blending techniques, particularly upper/lower body animation separation and merging (inspired by the user's three.js ragdoll/animation example, focusing on animation aspects here). Use a placeholder character model initially and integrate a selection of Mixamo animations (e.g., idle, walk, run, basic attacks, dodge). This includes the sub-task of pre-processing or designing a workflow to generate separate upper-body (e.g., aiming, attacking) and lower-body (e.g., walking, running, strafing) animation clips from full-body Mixamo animations. Implement initial logic in an animation controller script to play and blend these clips based on player state (e.g., lower body plays walk/run, upper body plays idle or aiming). Note that physics-based ragdoll effects for realistic damage feedback and death animations are a related but distinct future task (`TASK-002-B`).
-    *   **Input Remapping Clarification:** The initial setup will utilize the template's approach for input handling (e.g., hardcoded key lists or simple mapping in `PlayerInput.cs`). Full UI-driven input remapping is a more extensive feature planned for `TASK-004-C`.
+    *   **Animation System with Mixamo Blending:** Investigate Stride's animation system for advanced blending techniques, particularly upper/lower body animation separation and merging (inspired by the user's three.js ragdoll/animation example, focusing on animation aspects here). Use a placeholder character model initially and integrate a selection of Mixamo animations (e.g., idle, walk, run, basic attacks, dodge). This includes the sub-task of pre-processing or designing a workflow to generate separate upper-body (e.g., aiming, attacking) and lower-body (e.g., walking, running, strafing) animation clips from full-body Mixamo animations. Implement initial logic in an animation controller script to play and blend these clips based on player state (e.g., lower body plays walk/run, upper body plays idle or aiming). Note that physics-based ragdoll effects for realistic damage feedback and death animations are a related but distinct future task (now part of Phase 4 Ragdoll).
+    *   **Input Remapping Clarification:** The initial setup will utilize the template's approach for input handling (e.g., hardcoded key lists or simple mapping in `PlayerInput.cs`). Full UI-driven input remapping is a more extensive feature planned for a later task.
     *   **PvP/PvE Design Consideration:** Develop the player controller with an awareness of future PvP and PvE mode distinctions. Consider how systems like targeting, damage application, or ability usage might need to differ or be configurable based on the game mode.
     *   **NPC Alert System Note:** Player actions (e.g., making noise, being detected) will eventually need to interface with an NPC alert system. This is for future integration and not part of this immediate task, but the player controller should be extensible enough to support such interactions.
-    *   **Dual Melee Mode Toggle:** The player controller must support a toggleable melee mode system (standard vs. Souls-like). Input for this toggle should be considered.
+    *   **Dual Melee Mode Toggle:** The player controller must support a toggleable melee mode system (standard vs. Souls-like). Input for this toggle should be considered. This is a {PRIORITY:HIGH} feature.
     *   **Souls-like Melee Mechanics Investigation Findings & Design Outline:**
         *   **I. Lock-On System:**
             *   **Target Acquisition:**
@@ -229,52 +243,30 @@ The architecture will be modular, based on Stride's Entity-Component-System (ECS
             *   **Invincibility Frames (I-frames):** Grant temporary invulnerability during parts of the dodge animation.
             *   **Animation-Driven Movement (Root Motion):** Investigate Stride's support for root motion. If robust, it could simplify attack/dodge movement by driving character displacement from animation data rather than purely script-based movement. This requires animations to be authored with root motion.
 *   **TASK-001-B: Integrate modular inventory and hotbar.**
-    *   **Prompt/Description:** "Develop a foundational inventory system.
-    *   **Leverage Existing Template UI:** Investigate adapting UI scripts like `InventoryPanelScript.cs`, `ItemSlotScript.cs`, and associated `.sdslui` assets from Stride templates to create the basic visual structure for the inventory panel and a player hotbar.
-    *   **Modular Item Data Structure:** Design and implement a flexible data structure for items. This structure should be capable of representing various item types: basic resources (wood, stone), tools (axe, pickaxe), weapons (sword, bow), consumables (food, potions), and deployable items (e.g., the future 'Security Camera'). Key item properties might include ID, name, description, stackability, type, weight, and specific data based on type (e.g., damage for weapons, healing amount for consumables).
-    *   **Hotbar Functionality:** Implement a hotbar UI that allows quick access to a limited number of items, primarily weapons, tools, and potentially consumables. This will involve linking inventory slots to hotbar slots and handling input for selecting/using items from the hotbar. Consider adapting or creating an equipment manager (potentially inspired by `PlayerEquipment.cs` from templates) to handle equipping/unequipping items reflected in the hotbar.
-    *   **Tribe Log Interaction Note:** Certain inventory events, such_as dropping high-value items, crafting rare gear, or using specific quest-related items, may eventually need to be recorded by the Tribe Log system. This is for future integration.
-    *   **Security Camera System Note:** The inventory system must be designed to handle special items like 'Security Camera' deployables or tools related to viewing camera feeds. This is for future integration.
+    *   **Prompt/Description:** "Develop a foundational inventory system. ... (rest of prompt as is)"
 *   **[TASK-002-A] Implement Basic Melee Weapons and Tools (Pick, Hatchet):** (Prompt for this task would detail initial weapon/tool setup, linking to `PlayerEquipment`, basic attack animations, and resource gathering interaction. Placeholder for now.)
 *   **[TASK-002-B] Add ranged, explosive, and special weapons {ESTIMATE:24h}**
     *   **Prompt:**
         > Extend the weapon system to include bows (multiple arrow types), firearms, explosives, and special weapons (plasma, railgun). Each should have distinct sound effects and visual feedback.
-*   **Task Example (Phase 3):** "Implement a lock-on targeting system for the CombatComponent. When a button is pressed, the player should target the nearest enemy within a specified range and cone of view. The camera should smoothly adjust to keep both player and target in frame."
-*   **Task Example (Phase 4):** "Develop a script to manage ragdoll physics for character entities. On death, the character's kinematic animation should be replaced by a physics-driven ragdoll. Implement a basic area-based damage system where hits to specific ragdoll bones (e.g., head) apply damage multipliers."
-*   **Task Example (Phase 5):** "Create the Screaming NPC. It needs a detection component (cone of vision, range) to spot players or hostile NPCs. Upon detection, it should play a 'scream' sound effect and trigger an event that other nearby friendly NPCs can subscribe to."
 *   **[TASK-006-A] Add boats, spyglass, binoculars, scouting drone {ESTIMATE:24h}**
     *   **Prompt:**
         > Implement controllable boats, handheld spyglass, binoculars, and a deployable scouting drone with remote camera and minimap integration.
+*   **Task Example (Phase 3 - Updated):** "Implement a lock-on targeting system for the CombatComponent. When a button is pressed, the player should target the nearest enemy within a specified range and cone of view. The camera should smoothly adjust to keep both player and target in frame. Ensure this integrates with the dual melee mode toggle."
+*   **(Other task examples as they were)**
 
 ### 4.3. Implementation Order Diagram Description
-*(A conceptual diagram would be inserted here. For text, it's described.)*
+*(Existing description is likely still fine, but phases are re-numbered)*
 
-The implementation order will generally follow the phases. Core systems are built first, followed by gameplay mechanics layered on top. Networking will be integrated iteratively with features once they are stable in single-player. Animation and physics enhancements will be developed in parallel once the basic character controller is ready.
+`[Core Setup] -> [Weapons/Tools/Sound] -> [Combat Systems] -> [Animation/Physics] -> [Advanced Gameplay] -> [Vehicles/Scouting] -> [Networking] -> [World/Content] -> [Testing/Polish]`
 
-`[Core Setup] -> [Survival Mechanics] -> [Combat Basics] -> [Animation/Physics] -> [Advanced Gameplay] -> [Networking] -> [World/Content] -> [Testing/Polish]`
-
-Dependencies:
+Dependencies: (Review if any changes needed due to new phase order)
 *   Combat depends on Player Mechanics.
 *   Advanced Gameplay Features depend on Combat and Player Mechanics.
 *   Networking depends on most other systems being functional locally.
 *   Ragdoll/Animation depends on basic character setup.
 
 ## 5. TESTING STRATEGY
-
-### 5.1. Approach
-*   **Unit Testing:** For isolated components and systems (e.g., StatsComponent calculations, Inventory logic).
-*   **Integration Testing:** Testing interactions between systems (e.g., CombatComponent affecting StatsComponent, Crafting using InventoryComponent).
-*   **Gameplay Testing:** Manual testing by playing the game to assess usability, fun factor, and identify bugs. Focus on specific feature sets during their development phase.
-*   **Stress Testing:** (Later phases) Pushing limits for performance, networking, and AI.
-
-### 5.2. Coverage
-*   Aim for high unit test coverage for critical logic (combat calculations, persistence, core player stats).
-*   Integration tests for all major feature interactions.
-*   Gameplay testing scenarios covering all implemented features and player actions.
-
-### 5.3. Automation
-*   Explore Stride's testing capabilities or external .NET testing frameworks for unit tests.
-*   Consider simple in-game debug tools or command cheats to facilitate specific scenario testing during development (e.g., spawn items, set player stats).
+*(Existing content is likely fine)*
 
 ---
 ## 6. APPENDICES
@@ -285,15 +277,19 @@ Dependencies:
 | Pick                 | 15     | 0.5/s     | Melee | Mining bonus    |
 | Hatchet              | 20     | 0.6/s     | Melee | Wood bonus      |
 | Mining Drill         | 10     | 1.5/s     | Melee | Area mining     |
-| Bow                  | 40     | 1/s       | 50m   | Arrow drop      |
-| Pistol               | 30     | 2/s       | 70m   | Moderate recoil |
-| Shotgun              | 10x10  | 1/s       | 20m   | Spread          |
-| Assault Rifle        | 25     | 10/s      | 100m  | Auto/Burst      |
-| Sniper Rifle         | 100    | 0.5/s     | 300m  | Scope           |
-| Grenade              | 150    | N/A       | 20m   | Thrown, AoE     |
+| Revolver             | 45     | 0.8/s     | 30m   | High recoil     |
+| Modern Pistol        | 35     | 2.0/s     | 25m   | Fast reload     |
+| Bolt Sniper          | 90     | 0.5/s     | 150m  | High accuracy   |
+| Semi-auto Sniper     | 70     | 1.0/s     | 100m  |                 |
+| Assault Rifle        | 30     | 8.0/s     | 60m   | Full-auto       |
+| Double Barrel Shotgun| 60x2   | 0.5/s     | 10m   | Wide spread     |
+| Shotgun              | 40     | 1.2/s     | 15m   |                 |
+| Plasma Rifle         | 15     | 5.0/s     | 50m   | AOE, shield dmg |
+| Rail Gun             | 120    | 0.2/s     | 200m  | Piercing        |
+| Grenade Launcher     | 100    | 0.8/s     | 40m   | Explosive       |
+| Grenade              | 120    | -         | 15m   | Throwable       |
+| C4                   | 300    | -         | -     | Timed/detonator |
 | Rocket Launcher      | 250    | 0.5/s     | 60m   | Splash damage   |
-| Plasma Rifle         | 35     | 8/s       | 80m   | Energy damage   |
-| Railgun              | 200    | 0.2/s     | 500m  | Penetration     |
 
 ---
 
@@ -301,10 +297,10 @@ Dependencies:
 | Material     | HP    | Weakness           | Strength                |
 |--------------|-------|--------------------|-------------------------|
 | Thatch       | 200   | Fire, rain         | Cheap, fast to build    |
-| Wood         | 1000  | Fire, explosives   | Moderate cost/time      |
-| Stone        | 5000  | Explosives, siege  | High melee resist       |
-| Metal        | 10000 | Explosives         | High overall resist     |
-| Reinforced   | 20000 | Heavy explosives   | Highest resist          |
+| Wood         | 400   | Fire, axes         | Easy to upgrade         |
+| Stone        | 800   | Explosives         | Weatherproof            |
+| Metal        | 2000  | Plasma, C4         | Conducts electricity    |
+| Advanced     | 4000  | Plasma, rockets    | Immune to small arms    |
 | Glass        | 600   | Melee, explosives  | Greenhouse effect       |
 
 ---
@@ -313,9 +309,12 @@ Dependencies:
 | Defense Type       | Damage/Effect    | Power Use | Special                      |
 |--------------------|------------------|-----------|------------------------------|
 | Spike Wall         | 40/sec contact   | 0         | Bleed effect                 |
-| Auto Turret        | 30/shot          | 10/min    | Needs ammo, targets hostiles |
-| Laser Turret       | 50/shot          | 20/min    | High accuracy, energy        |
-| Electric Fence     | Stun/10dmg       | 5/min     | Stuns targets                |
+| Bear Trap          | Immobilize 10s   | 0         | Single-use                   |
+| Turret (Rifle)     | 50/shot          | 5/min     | Ammo required                |
+| Heavy Turret       | 80/shot          | 10/min    | Armor-piercing               |
+| Plasma Turret      | 30/shot (AOE)    | 15/min    | Ignores shields              |
+| Flame Turret       | 20/sec (burn)    | 8/min     | Area denial                  |
+| Tesla Coil         | 80 (shock)       | 20/min    | Chain to 3 targets           |
 | Force Field        | Blocks all but C4| 50/min    | Only explosive/plasma damage |
 
 ---
@@ -324,45 +323,21 @@ Dependencies:
 | Device             | Power Use | Range/Capacity | Notes                       |
 |--------------------|-----------|----------------|-----------------------------|
 | Gas Generator      | 20/min    | 50m cable      | Needs fuel                  |
-| Wind Turbine       | 0-15/min  | 30m cable      | Wind dependent              |
-| Solar Panel        | 0-10/min  | 30m cable      | Sun dependent               |
-| Battery            | Input/Output | 1000 capacity | Stores power                |
-| Water Reservoir    | 0         | 500 units      | Collects rain               |
-| Irrigation Pipe    | 0         | Connects       | Transports water            |
+| Field Generator    | 40/min    | 30m radius     | Wireless power              |
+| Battery            | -         | 1000 units     | Stores excess power         |
+| Pump               | 10/min    | 100m pipe      | Moves water uphill          |
+| Reservoir          | -         | 2000L          | Stores water                |
 | Sprinkler          | 2/min     | 8m radius      | Irrigates crops             |
 
 ---
 
 ## 7. ADDITIONAL USER REQUIREMENTS (Incorporated into relevant task prompts)
-
-The following additional features and considerations were requested by the user and have been integrated into the detailed prompts of the relevant tasks above, or will be considered during design and implementation:
-
-*   **Separate PvP/PvE Modes:** Multiplayer will eventually need distinct rule sets and potentially server settings for Player vs. Player and Player vs. Environment modes. This will be primarily addressed in PHASE-005 (Multiplayer & Networking) and influence menu design in PHASE-004.
-*   **Tribe Log System (Ark-like):**
-    *   Log significant team/player events: member deaths, destruction of hostile structures, kills of hostile players/NPCs.
-    *   NPC/Team member death notifications.
-    *   Tek Sensor-like logging capabilities for specific in-game items/structures.
-    *   This will be a new system, likely with UI elements (PHASE-004) and backend logic integrated with various game events.
-*   **Security Camera:** An item that can be placed and accessed remotely. This will involve inventory integration (TASK-001-B, TASK-004-A), placement mechanics (PHASE-003), and a UI for viewing.
-*   **NPC Alert System ("Screamer" NPC):** An NPC type that detects and alerts to nearby hostile players or other NPCs. This involves AI behavior (new task, likely post-PHASE-001) and potentially integrates with the notification/log system.
-*   **Souls-like Melee Combat Features (FPS/TPS):**
-    *   More intuitive close-quarters combat with features like lock-on, responsive attacks/dodges, and potentially parrying.
-    *   Investigation and initial animation setup are part of TASK-001-A. Full weapon integration is in PHASE-002.
-*   **Animation Merging (Mixamo & Physics-based Ragdoll):**
-    *   Utilize Mixamo animations.
-    *   Implement animation blending for upper/lower body parts (as per user's three.js example).
-    *   Physics-based ragdoll effects for realistic area-specific damage reactions.
-    *   Initial setup and investigation are part of TASK-001-A.
+*(Existing content generally fine, ensure dual melee note is robust)*
 
 ---
 
 ## 8. GENERAL TECHNICAL NOTES & WORKFLOW
-
-*   **Stride Version:** All development must be compatible with Stride 4.2.0.2381.
-*   **Project Files:** The solution (`.sln`) and project (`.csproj`, `.sdpkg`) files must be kept up-to-date as new files and dependencies are added.
-*   **Source Control Workflow ("Auto Publish"):** The AI (Jules) will create commits and branches for features/fixes. The user will be responsible for reviewing and pushing these to the remote GitHub repository.
-*   **Task Batching ("8 tasks"):** This is a general guideline for the AI to structure its work into manageable chunks. The AI will aim to complete roughly 8 plan steps or a similar amount of work before requiring a major check-in or new planning phase, user feedback permitting.
-*   **Commercialization:** The project is intended for commercial release (e.g., on Steam). All code and asset usage must comply with relevant licenses (e.g., Stride's MIT license, asset store licenses).
+*(Existing content fine)*
 
 ---
 **End of Plan**

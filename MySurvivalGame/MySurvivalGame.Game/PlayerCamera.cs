@@ -7,6 +7,8 @@ using Stride.Engine;
 using Stride.Input;
 using Stride.Physics;
 using Stride.Engine.Events; // Required for EventKey and EventReceiver
+using MySurvivalGame.Game.Player; // Required for PlayerLockOnManager
+using MySurvivalGame.Game.Combat; // Required for TargetableComponent
 
 namespace MySurvivalGame.Game // MODIFIED: Namespace updated
 {
@@ -76,6 +78,12 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
         // Event listeners
         private EventReceiver<Vector2> cameraDirectionEventListener;
         private EventListener<EventKey> switchCameraModeEventListener;
+        private EventReceiver<Entity> targetLockedListener;
+        private EventReceiver targetUnlockedListener;
+
+        // Lock-on state
+        private Entity lockedTarget;
+        private PlayerLockOnManager playerLockOnManager;
 
 
         public override void Start()
@@ -119,6 +127,21 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
             {
                 Log.Error("PlayerInput is not assigned or found on Player entity for PlayerCamera. Camera will not respond to input.");
             }
+
+            // Attempt to get PlayerLockOnManager from the Player entity
+            if (Player != null)
+            {
+                playerLockOnManager = Player.Get<PlayerLockOnManager>();
+                if (playerLockOnManager != null)
+                {
+                    targetLockedListener = new EventReceiver<Entity>(PlayerLockOnManager.TargetLockedEvent, HandleTargetLocked);
+                    targetUnlockedListener = new EventReceiver(PlayerLockOnManager.TargetUnlockedEvent, HandleTargetUnlocked);
+                }
+                else
+                {
+                    Log.Warning("PlayerLockOnManager not found on Player entity. Lock-on camera adjustments will not function.");
+                }
+            }
             
             UpdateCameraModeVisuals(); // Initial setup for player model visibility
         }
@@ -127,15 +150,36 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
         {
             // Unsubscribe from events to prevent memory leaks
             PlayerInput?.SwitchCameraModeEventKey.RemoveListener(HandleSwitchCameraMode);
-            // EventReceiver does not need explicit removal like this, it's managed by its lifetime.
-            // if (cameraDirectionEventListener != null) { /* clean up if necessary, usually not for EventReceiver */ }
+            targetLockedListener?.Dispose(); // EventReceiver uses IDisposable for cleanup
+            targetUnlockedListener?.Dispose();
 
             base.Cancel();
+        }
+
+        private void HandleTargetLocked(Entity target)
+        {
+            if (target != null)
+            {
+                Log.Info($"PlayerCamera: Target locked: {target.Name}");
+                lockedTarget = target;
+            }
+        }
+
+        private void HandleTargetUnlocked()
+        {
+            Log.Info("PlayerCamera: Target unlocked.");
+            lockedTarget = null;
         }
         
         private void HandleSwitchCameraMode(EventKey sender) // MODIFIED: Parameter changed to EventKey
         {
             currentMode = (currentMode == CameraMode.FPS) ? CameraMode.TPS : CameraMode.FPS;
+            if (currentMode == CameraMode.FPS && lockedTarget != null)
+            {
+                // If switching to FPS while locked on, optionally clear the lock
+                // playerLockOnManager?.ClearLockOnTarget(); // This would call HandleTargetUnlocked
+                Log.Info("Switched to FPS mode, maintaining lock-on if active. Camera will not follow target in FPS.");
+            }
             UpdateCameraModeVisuals();
         }
 
@@ -184,74 +228,116 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
             // So, CameraDirectionEventKey effectively carries already-scaled rotation values.
             // The CameraSensitivity here should ideally be 1.0f if PlayerInput handles all scaling.
             // If PlayerInput.MouseSensitivity is e.g. 100, and here CameraSensitivity is 20, the net effect is 2000x.
-            // For now, assuming PlayerInput's CameraDirectionEventKey provides the final intended rotation delta.
-            yaw -= currentCameraInputDelta.X * CameraSensitivity; 
-            pitch -= currentCameraInputDelta.Y * CameraSensitivity; 
+            // Process event queues for lock-on
+            targetLockedListener?.TryReceive();
+            targetUnlockedListener?.TryReceive();
+
+            // --- Camera Rotation ---
+            if (lockedTarget != null && currentMode == CameraMode.TPS)
+            {
+                var targetable = lockedTarget.Get<TargetableComponent>();
+                if (targetable != null && targetable.IsTargetable)
+                {
+                    var targetWorldPos = targetable.GetWorldLockOnPoint();
+                    var cameraPivotPos = Player.Transform.WorldMatrix.TranslationVector + Vector3.UnitY * DefaultTpsHeightOffset;
+                    
+                    // Player still rotates freely with yaw input for now, camera tries to follow target
+                    // This allows player to "break" lock by turning away, or for target to move out of comfortable view arc
+                    yaw -= currentCameraInputDelta.X * CameraSensitivity;
+                    // Player.Transform.Rotation = Quaternion.RotationY(yaw); // Player rotates based on their input
+
+                    // Calculate direction to target
+                    Vector3 directionToTarget = targetWorldPos - cameraPivotPos;
+                    directionToTarget.Normalize();
+
+                    // Derive yaw and pitch from this direction
+                    float targetYaw = MathF.Atan2(directionToTarget.X, directionToTarget.Z); // Note: Stride uses (X,Z) for Y-axis rotation
+                    float targetPitch = MathF.Asin(-directionToTarget.Y);
+
+                    // Apply player's pitch input as an offset/adjustment, clamped
+                    // This allows player to look slightly up/down relative to target
+                    float desiredPitch = targetPitch - (currentCameraInputDelta.Y * CameraSensitivity);
+                    pitch = MathUtil.Clamp(desiredPitch, MathUtil.DegreesToRadians(RotationXMin), MathUtil.DegreesToRadians(RotationXMax));
+                    
+                    // The camera's final yaw will be mostly determined by the target.
+                    // Player's horizontal input could be used to "strafe" view or switch targets (handled by LockOnManager)
+                    // For now, camera directly faces target, player can rotate independently.
+                    // To make player face target: Player.Transform.Rotation = Quaternion.RotationY(targetYaw);
+                    // To make camera strictly follow target from player's back:
+                    Entity.Transform.Rotation = Quaternion.RotationY(targetYaw) * Quaternion.RotationX(pitch);
+
+                    // Player entity itself should rotate towards the target if we want strafing movement
+                    Player.Transform.Rotation = Quaternion.LookAtLH(Player.Transform.WorldMatrix.TranslationVector, new Vector3(targetWorldPos.X, Player.Transform.WorldMatrix.TranslationVector.Y, targetWorldPos.Z), Vector3.UnitY).ToEulerAngles().Y;
+
+
+                }
+                else
+                {
+                    // Target became invalid, clear it
+                    playerLockOnManager?.ClearLockOnTarget(); // This will trigger HandleTargetUnlocked
+                    // Fallback to normal rotation for this frame
+                    UpdateNormalCameraRotation();
+                }
+            }
+            else
+            {
+                UpdateNormalCameraRotation();
+            }
             currentCameraInputDelta = Vector2.Zero; // Reset after use for this frame
+
+
+            // --- Camera Positioning ---
+            Vector3 cameraPivotPosition; // The point the camera looks at or originates from for raycasting
+            Vector3 desiredCameraPosition; // The final position the camera should move to
+
+            var playerWorldPosition = Player.Transform.WorldMatrix.TranslationVector;
+            Vector3 desiredCameraPosition;
+
+            if (currentMode == CameraMode.FPS)
+            {
+                cameraPivotPosition = playerWorldPosition + Vector3.UnitY * FpsTargetHeight;
+                Entity.Transform.Position = cameraPivotPosition;
+                // FPS Rotation is already set based on normal input or if locked (but not visually following target in FPS)
+            }
+            else // TPS Mode
+            {
+                cameraPivotPosition = playerWorldPosition + Vector3.UnitY * DefaultTpsHeightOffset;
+                
+                // Offset direction is based on the camera's current full rotation (yaw and pitch),
+                // which is now influenced by the locked target if active.
+                Vector3 offsetDirection = Vector3.Transform(-Vector3.UnitZ, Entity.Transform.Rotation); // Use camera's actual rotation
+                desiredCameraPosition = cameraPivotPosition + offsetDirection * DefaultTpsDistance;
+
+                // Basic Collision Detection
+                if (simulation != null)
+                {
+                    var raycastStart = cameraPivotPosition;
+                    var raycastEnd = desiredCameraPosition;
+                    var hitResult = simulation.Raycast(raycastStart, raycastEnd, CollisionFilterGroups.DefaultFilter, CollisionFilterGroupFlags.DefaultFilter);
+
+                    if (hitResult.Succeeded)
+                    {
+                        desiredCameraPosition = hitResult.Point + (raycastStart - raycastEnd).Normalized() * TpsCollisionMargin;
+                    }
+                }
+                Entity.Transform.Position = desiredCameraPosition;
+            }
+        }
+
+        private void UpdateNormalCameraRotation()
+        {
+            // Apply sensitivity 
+            yaw -= currentCameraInputDelta.X * CameraSensitivity;
+            pitch -= currentCameraInputDelta.Y * CameraSensitivity;
 
             // Clamp pitch
             pitch = MathUtil.Clamp(pitch, MathUtil.DegreesToRadians(RotationXMin), MathUtil.DegreesToRadians(RotationXMax));
 
             // Player orientation (only yaw, pitch is for camera only)
-            // The Player entity itself should only rotate around the Y axis (yaw).
             Player.Transform.Rotation = Quaternion.RotationY(yaw);
-
-            // Camera's local rotation (pitch) relative to the player's yaw.
-            // The camera entity (Entity) is a child of Player, so its world rotation will be Player's world rotation * local camera rotation.
-            // However, this script is attached to the Camera Entity itself, which might not be a child of Player yet
-            // as per BasicScene.sdscene structure. The scene setup in step 3 will make Camera a child of Player.
-            // For FPS, camera is at player's head. For TPS, it's offset.
-            // The camera entity's rotation should be the full yaw and pitch.
+            
+            // Camera's rotation
             Entity.Transform.Rotation = Quaternion.RotationY(yaw) * Quaternion.RotationX(pitch);
-
-
-            // --- Camera Positioning ---
-            Vector3 cameraTargetPosition; // The point the camera looks at or originates from for raycasting
-            Vector3 desiredCameraPosition; // The final position the camera should move to
-
-            var playerWorldPosition = Player.Transform.WorldMatrix.TranslationVector;
-
-            if (currentMode == CameraMode.FPS)
-            {
-                // Camera is positioned at the FpsTargetHeight on the Player entity.
-                // Player.Transform.Position is the base of the player.
-                // The Camera entity (this.Entity) is what needs to be positioned.
-                // If Camera is a child of Player, its local position is relative to Player.
-                desiredCameraPosition = Player.Transform.WorldMatrix.TranslationVector + Vector3.Transform(new Vector3(0, FpsTargetHeight, 0), Player.Transform.Rotation);
-                // More simply, if camera is child of player and player rotation is already set:
-                // Entity.Transform.LocalPosition = new Vector3(0, FpsTargetHeight, 0);
-                // Entity.Transform.Position will be automatically calculated.
-                // For FPS, the camera entity should be directly at the eye height, and share player's yaw, and have its own pitch.
-                // The Player entity rotates with yaw. The Camera entity (this script is on) also rotates with yaw AND pitch.
-                // So, the camera's position is relative to the already rotated Player.
-                cameraTargetPosition = playerWorldPosition + Vector3.UnitY * FpsTargetHeight; // More accurate if player is base
-                Entity.Transform.Position = cameraTargetPosition;
-                Entity.Transform.Rotation = Quaternion.RotationY(yaw) * Quaternion.RotationX(pitch);
-
-
-            }
-            else // TPS Mode
-            {
-                // TPS camera orbits around a point slightly above the player's root.
-                cameraTargetPosition = playerWorldPosition + Vector3.UnitY * DefaultTpsHeightOffset;
-                
-                // Offset direction is based on the camera's current full rotation (yaw and pitch)
-                Vector3 offsetDirection = Vector3.Transform(-Vector3.UnitZ, Entity.Transform.Rotation);
-                desiredCameraPosition = cameraTargetPosition + offsetDirection * DefaultTpsDistance;
-
-                // Basic Collision Detection
-                var raycastStart = cameraTargetPosition;
-                var raycastEnd = desiredCameraPosition;
-                var hitResult = simulation.Raycast(raycastStart, raycastEnd, CollisionFilterGroups.DefaultFilter, CollisionFilterGroupFlags.DefaultFilter); // Specify filter groups
-
-                if (hitResult.Succeeded)
-                {
-                    // Move camera to hit point, plus a margin so it doesn't clip into the geometry
-                    desiredCameraPosition = hitResult.Point + (raycastStart - raycastEnd).Normalized() * TpsCollisionMargin;
-                }
-                Entity.Transform.Position = desiredCameraPosition;
-                Entity.Transform.Rotation = Quaternion.RotationY(yaw) * Quaternion.RotationX(pitch);
-            }
         }
     }
 }
