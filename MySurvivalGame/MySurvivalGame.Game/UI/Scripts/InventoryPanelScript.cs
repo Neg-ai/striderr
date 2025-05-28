@@ -12,10 +12,11 @@ using System.Collections.Generic;
 using System.Linq; // For First() method
 
 // Assuming ItemSlotScript is in the same namespace or referenced correctly
-// using FirstPersonShooter.UI.Scripts; 
-using FirstPersonShooter.Items; // For MockInventoryItem
+// using MySurvivalGame.Game.UI.Scripts; // Self-reference not needed
+using MySurvivalGame.Game.Items; // MODIFIED: For MockInventoryItem
+using MySurvivalGame.Game.Player; // ADDED: For PlayerHotbarManager
 
-namespace FirstPersonShooter.UI.Scripts
+namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
 {
     public class InventoryPanelScript : UIScript
     {
@@ -30,6 +31,9 @@ namespace FirstPersonShooter.UI.Scripts
         
         private List<ItemSlotScript> inventorySlots = new List<ItemSlotScript>();
         private List<ItemSlotScript> hotbarSlots = new List<ItemSlotScript>();
+        // private List<MySurvivalGame.Game.Items.MockInventoryItem> actualPlayerItems = new List<MySurvivalGame.Game.Items.MockInventoryItem>(); // REMOVED: This will be managed by PlayerInventoryComponent
+        private PlayerInventoryComponent playerInventory; // ADDED: Reference to the player's actual inventory data
+        private List<ItemSlotScript> allManagedSlots = new List<ItemSlotScript>(); 
 
         // Fields for drag operation
         private ImageElement dragVisual;
@@ -45,6 +49,8 @@ namespace FirstPersonShooter.UI.Scripts
         private ItemSlotScript currentlyHoveredSlot = null;
         private float hoverTimer = 0f;
         private const float hoverDelay = 0.5f; // Seconds before tooltip appears
+
+        private PlayerHotbarManager playerHotbarManager; // ADDED: For linking
 
 
         public override void Start()
@@ -93,12 +99,41 @@ namespace FirstPersonShooter.UI.Scripts
                 Log.Error("InventoryPanelScript: HotbarPanel not found in UI.");
             }
 
-            // Initialize grids and populate with mock data
+            // Initialize grids
             if (inventoryGrid != null) InitializeInventoryGrid(numberOfSlots: 48); // 6 rows * 8 columns
             if (hotbarPanel != null) InitializeHotbar(numberOfSlots: 8);
             
             UpdatePlayerStats(currentHealth: 100, maxHealth: 100, currentWeight: 10, maxWeight: 50); // Mock data
-            PopulateWithMockData(); // For testing UI population
+            // PopulateWithMockData(); // MODIFIED: Commented out or removed
+
+            // MODIFIED: Find PlayerInventoryComponent and add test items
+            var playerEntityForInventory = Entity.Scene?.RootEntities.FirstOrDefault(e => e.Name == "Player");
+            if (playerEntityForInventory != null)
+            {
+                playerInventory = playerEntityForInventory.Get<PlayerInventoryComponent>();
+                if (playerInventory != null)
+                {
+                    // Add test items using the component's method only if the inventory is currently empty
+                    if (!playerInventory.AllPlayerItems.Any()) 
+                    {
+                        playerInventory.AddItem(new MockInventoryItem("Wood", "Resource", "A sturdy piece of wood.", null, 30, null, 64, EquipmentType.None));
+                        playerInventory.AddItem(new MockInventoryItem("Stone", "Resource", "A common grey stone.", null, 90, null, 64, EquipmentType.None));
+                        playerInventory.AddItem(new MockInventoryItem("Iron Axe", "Tool", "A basic axe.", null, 1, 0.8f, 1, EquipmentType.Tool));
+                        playerInventory.AddItem(new MockInventoryItem("Health Potion", "Consumable", "Restores health.", null, 5, null, 10, EquipmentType.Consumable));
+                        playerInventory.AddItem(new MockInventoryItem("Old Pistol", "Weapon", "An old pistol.", null, 1, 0.5f, 1, EquipmentType.Weapon));
+                    }
+                }
+                else
+                {
+                     Log.Error("InventoryPanelScript: PlayerInventoryComponent not found on Player entity.");
+                }
+            }
+            else
+            {
+                Log.Error("InventoryPanelScript: Player entity not found for inventory.");
+            }
+            
+            RefreshInventoryDisplay(); 
 
             // Create and add dragVisual
             dragVisual = new ImageElement 
@@ -137,6 +172,17 @@ namespace FirstPersonShooter.UI.Scripts
             else
             {
                 Log.Error("InventoryPanelScript: TooltipPanel not found in UI.");
+            }
+
+            // ADDED: Find PlayerHotbarManager
+            var playerEntity = Entity.Scene?.RootEntities.FirstOrDefault(e => e.Name == "Player");
+            if (playerEntity != null)
+            {
+                playerHotbarManager = playerEntity.Get<PlayerHotbarManager>();
+            }
+            if (playerHotbarManager == null)
+            {
+                Log.Error("InventoryPanelScript: Could not find PlayerHotbarManager component in the scene.");
             }
         }
 
@@ -184,6 +230,7 @@ namespace FirstPersonShooter.UI.Scripts
 
             inventoryGrid.Children.Clear();
             inventorySlots.Clear();
+            allManagedSlots.Clear(); // MODIFIED: Clear the consolidated list here
 
             for (int i = 0; i < numberOfSlots; i++)
             {
@@ -222,6 +269,7 @@ namespace FirstPersonShooter.UI.Scripts
                 {
                     inventoryGrid.Children.Add(uiComponent.Page.RootElement); // Add UI root to grid
                     inventorySlots.Add(itemSlotScript);
+                    allManagedSlots.Add(itemSlotScript); // MODIFIED: Add to consolidated list
                     itemSlotScript?.ClearSlot(); // Call ClearSlot on the script
                 }
                 else
@@ -260,6 +308,7 @@ namespace FirstPersonShooter.UI.Scripts
                 {
                     hotbarPanel.Children.Add(uiComponentHotbar.Page.RootElement); // Add UI root to panel
                     hotbarSlots.Add(itemSlotScript);
+                    allManagedSlots.Add(itemSlotScript); // MODIFIED: Add to consolidated list
                     itemSlotScript?.ClearSlot();
                 }
                 else
@@ -393,12 +442,36 @@ namespace FirstPersonShooter.UI.Scripts
                 // ItemSlotScript.SetItemData will update visuals from the MockInventoryItem.
                 targetSlot.SetItemData(sourceItem?.Icon, sourceItem?.Quantity ?? 0, sourceItem?.Durability, sourceItem);
                 sourceSlotOfDrag.SetItemData(targetItem?.Icon, targetItem?.Quantity ?? 0, targetItem?.Durability, targetItem);
+
+                // MODIFIED: Update playerInventory.AllPlayerItems to reflect the swap
+                if (playerInventory != null)
+                {
+                    playerInventory.AllPlayerItems.Clear(); // Clear the backend data
+                    foreach(var slot in allManagedSlots) // Repopulate from the UI state
+                    {
+                        if (slot?.ItemData != null)
+                        {
+                            // Ensure we are adding the actual ItemData instance that is now in the slot
+                            playerInventory.AllPlayerItems.Add(slot.ItemData); 
+                        }
+                    }
+                }
             }
             else
             {
                 Log.Info($"Item drop from '{sourceSlotOfDrag.Entity.Name}' was not on a valid different slot. Item returned.");
             }
             sourceSlotOfDrag = null;
+            // playerInventory.AllPlayerItems is now synced with allManagedSlots.
+            // Now, ensure PlayerHotbarManager is synced with the state of the hotbarSlots list.
+            if (playerHotbarManager != null)
+            {
+                for (int i = 0; i < hotbarSlots.Count; i++)
+                {
+                    playerHotbarManager.UpdateHotbarSlot(i, hotbarSlots[i]?.ItemData);
+                }
+            }
+            RefreshInventoryDisplay(); // Final refresh to ensure UI matches playerInventory (which should be authoritative)
         }
 
         private ItemSlotScript FindSlotAtScreenPosition(Vector2 screenPosition)
@@ -466,6 +539,72 @@ namespace FirstPersonShooter.UI.Scripts
             
             tooltipPanel.Visibility = Visibility.Visible;
             // Position update is handled in main Update loop
+        }
+
+        private void RefreshInventoryDisplay()
+        {
+            if (playerInventory == null)
+            {
+                //Log.Error("RefreshInventoryDisplay: playerInventory is null. Cannot refresh UI."); // Can be spammy if Player not found early
+                foreach (var slot in allManagedSlots) { slot?.ClearSlot(); } // Clear UI if no backend
+                return;
+            }
+
+            // Clear all UI slots first
+            foreach (var slot in allManagedSlots)
+            {
+                slot?.ClearSlot();
+            }
+
+            // Populate UI slots from the playerInventory.AllPlayerItems list
+            for (int i = 0; i < playerInventory.AllPlayerItems.Count; i++)
+            {
+                if (i < allManagedSlots.Count && playerInventory.AllPlayerItems[i] != null && allManagedSlots[i] != null)
+                {
+                    var item = playerInventory.AllPlayerItems[i];
+                    allManagedSlots[i].SetItemData(item.Icon, item.Quantity, item.Durability, item);
+                }
+                else if (i >= allManagedSlots.Count)
+                {
+                    Log.Warning("RefreshInventoryDisplay: More items in player's inventory than available UI slots.");
+                    break; 
+                }
+            }
+            // Log.Info("Inventory display refreshed from PlayerInventoryComponent."); // Can be spammy
+        }
+
+        public bool AddItemToInventory(MySurvivalGame.Game.Items.MockInventoryItem itemToAdd)
+        {
+            if (playerInventory == null) 
+            {
+                Log.Error("AddItemToInventory: playerInventory is null.");
+                return false;
+            }
+
+            bool success = playerInventory.AddItem(itemToAdd);
+            if (success)
+            {
+                RefreshInventoryDisplay();
+            }
+            return success;
+        }
+
+        public void RemoveItemFromSlot(ItemSlotScript slotToRemoveFrom)
+        {
+            if (playerInventory == null) 
+            {
+                Log.Error("RemoveItemFromSlot: playerInventory is null.");
+                return;
+            }
+            if (slotToRemoveFrom?.ItemData != null)
+            {
+                playerInventory.RemoveItem(slotToRemoveFrom.ItemData);
+            }
+            else
+            {
+                Log.Info("RemoveItemFromSlot called on an empty slot or slot without ItemData.");
+            }
+            RefreshInventoryDisplay();
         }
     }
 }
