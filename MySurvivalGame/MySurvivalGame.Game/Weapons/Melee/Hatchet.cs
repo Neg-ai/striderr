@@ -3,7 +3,7 @@ using Stride.Core.Mathematics; // For Vector3, Matrix
 using Stride.Physics;         // For Simulation, HitResult, SphereColliderShape
 using MySurvivalGame.Game.Core; // For IDamageable, DamageType
 using MySurvivalGame.Game.Player; // For PlayerInput (PlayerEquipment is not directly accessed for item data anymore)
-using MySurvivalGame.Data.Items;  // For ItemData, ToolStats, WeaponStats
+using MySurvivalGame.Game.Data.Items;  // For ItemData, ToolStats, WeaponStats
 using System.Collections.Generic; // For List<HitResult>
 using MySurvivalGame.Game.Audio; // ADDED for GameSoundManager
 
@@ -23,7 +23,7 @@ namespace MySurvivalGame.Game.Weapons.Melee
             }
             Log.Info($"{thisEntityName} ({ConfiguredItemData.ItemName}): Swung.");
             GameSoundManager.PlaySound("Hatchet_Swing", this.Entity.Transform.WorldMatrix.TranslationVector);
-            
+
             // Get relevant data from ConfiguredItemData
             // A hatchet is primarily a tool, but might have weapon stats as a fallback or if it's a combat hatchet.
             float damage = ConfiguredItemData.ToolData?.Damage ?? ConfiguredItemData.WeaponData?.Damage ?? 1.0f;

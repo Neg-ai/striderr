@@ -1,7 +1,7 @@
 using Stride.Core; // For DataContract and DataMember
 // using Stride.Graphics; // For Texture, if we decide to use direct Texture reference later
 
-namespace MySurvivalGame.Data.Items
+namespace MySurvivalGame.Game.Data.Items
 {
     [DataContract]
     public class ItemData
@@ -20,7 +20,7 @@ namespace MySurvivalGame.Data.Items
         /// The UI system will be responsible for loading this.
         /// </summary>
         [DataMember]
-        public string IconPath { get; set; } 
+        public string IconPath { get; set; }
         // Alternatively, if direct Texture reference becomes feasible for data assets:
         // public Texture Icon { get; set; }
 

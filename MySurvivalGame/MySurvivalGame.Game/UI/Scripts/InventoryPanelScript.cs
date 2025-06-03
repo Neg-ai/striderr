@@ -3,18 +3,18 @@
 
 using Stride.Core.Mathematics;
 using Stride.Engine;
-using Stride.Graphics; 
+using Stride.Graphics;
 using Stride.UI;
-using Stride.UI.Controls; 
-using Stride.UI.Panels;   
-using Stride.Input;       
+using Stride.UI.Controls;
+using Stride.UI.Panels;
+using Stride.Input;
 using System.Collections.Generic;
-using System.Linq; 
+using System.Linq;
 
-using MySurvivalGame.Data.Items;    // MODIFIED: For ItemData, ItemStack
+using MySurvivalGame.Game.Data.Items;    // MODIFIED: For ItemData, ItemStack
 using MySurvivalGame.Game.Player;   // For PlayerInventoryComponent, PlayerHotbarManager
 
-namespace MySurvivalGame.Game.UI.Scripts 
+namespace MySurvivalGame.Game.UI.Scripts
 {
     public class InventoryPanelScript : UIScript
     {
@@ -27,26 +27,26 @@ namespace MySurvivalGame.Game.UI.Scripts
         private TextBlock weightText; 
         private ProgressBar staminaBar; // ADDED: For stamina display
         
-        private List<ItemSlotScript> inventorySlotScripts = new List<ItemSlotScript>(); 
-        private List<ItemSlotScript> hotbarSlotScripts = new List<ItemSlotScript>();    
-        private PlayerInventoryComponent playerInventory; 
+        private List<ItemSlotScript> inventorySlotScripts = new List<ItemSlotScript>();
+        private List<ItemSlotScript> hotbarSlotScripts = new List<ItemSlotScript>();
+        private PlayerInventoryComponent playerInventory;
         private PlayerHotbarManager playerHotbarManager;
         private PlayerStaminaComponent playerStamina; // ADDED: For stamina data
 
         // Drag Operation
         private ImageElement dragVisual;
         private ItemSlotScript sourceSlotOfDrag;
-        private UIElement rootElement; 
+        private UIElement rootElement;
 
         // Tooltip
         private UIElement tooltipPanel;
         private TextBlock itemNameText;
         private TextBlock itemTypeText;
         private TextBlock itemDescriptionText;
-        private StackPanel itemStatsPanel; 
+        private StackPanel itemStatsPanel;
         private ItemSlotScript currentlyHoveredSlot = null;
         private float hoverTimer = 0f;
-        private const float hoverDelay = 0.5f; 
+        private const float hoverDelay = 0.5f;
 
 
         public override void Start()
@@ -67,7 +67,7 @@ namespace MySurvivalGame.Game.UI.Scripts
             if (playerStatsPanel != null)
             {
                 // Assuming Health is child 0, Weight is child 1. StaminaBar needs a name or specific index.
-                if (playerStatsPanel.Children.Count >= 2) 
+                if (playerStatsPanel.Children.Count >= 2)
                 {
                     healthText = playerStatsPanel.Children[0] as TextBlock;
                     weightText = playerStatsPanel.Children[1] as TextBlock;
@@ -91,14 +91,14 @@ namespace MySurvivalGame.Game.UI.Scripts
 
             // Initialize UI slots. Numbers should align with PlayerInventoryComponent.MaxInventorySlots
             // Example: PlayerInventoryComponent.MaxInventorySlots = 20. Hotbar = 8, MainInv = 12.
-            int numHotbarSlots = 8; 
-            int numMainInventoryGridSlots = 12; 
-            
+            int numHotbarSlots = 8;
+            int numMainInventoryGridSlots = 12;
+
             if (hotbarPanel != null) InitializeHotbar(numHotbarSlots);
-            if (inventoryGrid != null) InitializeInventoryGrid(numMainInventoryGridSlots); 
-            
+            if (inventoryGrid != null) InitializeInventoryGrid(numMainInventoryGridSlots);
+
             // Find Player components
-            var playerEntity = Entity.Scene?.RootEntities.FirstOrDefault(e => e.Name == "Player"); 
+            var playerEntity = Entity.Scene?.RootEntities.FirstOrDefault(e => e.Name == "Player");
             if (playerEntity != null)
             {
                 playerInventory = playerEntity.Get<PlayerInventoryComponent>();
@@ -170,7 +170,7 @@ namespace MySurvivalGame.Game.UI.Scripts
             }
             else { Log.Error("InventoryPanelScript: TooltipPanel not found in UI."); }
         }
-        
+
         public override void Update()
         {
             base.Update();
@@ -204,7 +204,7 @@ namespace MySurvivalGame.Game.UI.Scripts
                 }
             }
         }
-        
+
         private void UpdateTooltipPosition()
         {
             if (tooltipPanel != null && tooltipPanel.Visibility == Visibility.Visible && Input != null && rootElement != null)
@@ -215,15 +215,15 @@ namespace MySurvivalGame.Game.UI.Scripts
             }
         }
 
-        public void InitializeInventoryGrid(int numberOfSlots) 
+        public void InitializeInventoryGrid(int numberOfSlots)
         {
             if (inventoryGrid == null || ItemSlotPrefab == null) return;
             inventoryGrid.Children.Clear();
-            inventorySlotScripts.Clear(); 
+            inventorySlotScripts.Clear();
             for (int i = 0; i < numberOfSlots; i++) { CreateAndAddSlot(inventoryGrid, inventorySlotScripts, $"InventorySlot_{i}"); }
         }
 
-        public void InitializeHotbar(int numberOfSlots) 
+        public void InitializeHotbar(int numberOfSlots)
         {
             if (hotbarPanel == null || ItemSlotPrefab == null) return;
             hotbarPanel.Children.Clear();
@@ -243,14 +243,14 @@ namespace MySurvivalGame.Game.UI.Scripts
 
             var itemSlotScript = itemSlotEntity.Get<ItemSlotScript>();
             if (itemSlotScript == null) { Log.Error($"InventoryPanelScript: ItemSlotScript not found on prefab {itemSlotEntity.Name}."); }
-            
+
             if (itemSlotEntity.Scene == null) { this.Entity.AddChild(itemSlotEntity); }
 
             var uiComponent = itemSlotEntity.Get<UIComponent>();
             if (uiComponent?.Page?.RootElement != null)
             {
-                parentPanel.Children.Add(uiComponent.Page.RootElement); 
-                scriptList.Add(itemSlotScript); 
+                parentPanel.Children.Add(uiComponent.Page.RootElement);
+                scriptList.Add(itemSlotScript);
             }
             else { Log.Error($"InventoryPanelScript: Prefab {itemSlotEntity.Name} is missing UIComponent or Page setup."); }
         }
@@ -268,7 +268,7 @@ namespace MySurvivalGame.Game.UI.Scripts
             if (currentlyHoveredSlot != slot && tooltipPanel != null)
             {
                 tooltipPanel.Visibility = Visibility.Collapsed;
-                currentlyHoveredSlot = null; 
+                currentlyHoveredSlot = null;
             }
             sourceSlotOfDrag = slot;
             
@@ -342,16 +342,16 @@ namespace MySurvivalGame.Game.UI.Scripts
             int index = hotbarSlotScripts.IndexOf(slotScript);
             if (index != -1) return $"Hotbar_{index}";
             index = inventorySlotScripts.IndexOf(slotScript);
-            if (index != -1) return $"Inventory_{index}"; 
-            return slotScript.Entity.Name; 
+            if (index != -1) return $"Inventory_{index}";
+            return slotScript.Entity.Name;
         }
-        
+
         private int GetGlobalSlotIndex(ItemSlotScript slotScript)
         {
             if (slotScript == null || playerInventory == null) return -1;
 
             int uiIndex = hotbarSlotScripts.IndexOf(slotScript);
-            if (uiIndex != -1) 
+            if (uiIndex != -1)
             {
                 if (uiIndex < playerInventory.MaxInventorySlots) return uiIndex;
                 Log.Error($"Hotbar slot script {slotScript.Entity.Name} with UI index {uiIndex} is out of PlayerInventory bounds ({playerInventory.MaxInventorySlots}).");
@@ -372,7 +372,7 @@ namespace MySurvivalGame.Game.UI.Scripts
 
         public void HandleSlotPointerEnter(ItemSlotScript slot)
         {
-            if (sourceSlotOfDrag != null) return; 
+            if (sourceSlotOfDrag != null) return;
             currentlyHoveredSlot = slot;
             hoverTimer = hoverDelay; 
         }
@@ -382,7 +382,7 @@ namespace MySurvivalGame.Game.UI.Scripts
             if (currentlyHoveredSlot == slot)
             {
                 currentlyHoveredSlot = null;
-                hoverTimer = 0f; 
+                hoverTimer = 0f;
                 if (tooltipPanel != null) tooltipPanel.Visibility = Visibility.Collapsed;
             }
         }
@@ -397,12 +397,12 @@ namespace MySurvivalGame.Game.UI.Scripts
 
             ItemData item = slotScript.CurrentItemStack.Item;
             itemNameText.Text = item.ItemName ?? "Unknown Item";
-            itemTypeText.Text = item.Type.ToString(); 
+            itemTypeText.Text = item.Type.ToString();
             itemDescriptionText.Text = item.Description ?? "No description available.";
 
             if (itemStatsPanel != null)
             {
-                itemStatsPanel.Children.Clear(); 
+                itemStatsPanel.Children.Clear();
                 if (item.WeaponData != null)
                 {
                     itemStatsPanel.Children.Add(new TextBlock { Text = $"Damage: {item.WeaponData.Damage}", TextColor = Color.White, Margin = new Thickness(0,2,0,0) });
@@ -446,14 +446,14 @@ namespace MySurvivalGame.Game.UI.Scripts
             int mainInvUISlotCount = inventorySlotScripts.Count;
             for (int i = 0; i < mainInvUISlotCount; i++)
             {
-                int inventoryDataIndex = hotbarUISlotCount + i; 
+                int inventoryDataIndex = hotbarUISlotCount + i;
                 if (inventoryDataIndex < playerInventory.InventorySlots.Count)
                 {
                     inventorySlotScripts[i]?.SetItemStack(playerInventory.InventorySlots[inventoryDataIndex]);
                 }
                 else { inventorySlotScripts[i]?.SetItemStack(null); }
             }
-            
+
              if (playerHotbarManager != null)
             {
                 for (int i = 0; i < hotbarUISlotCount; i++)
@@ -474,7 +474,7 @@ namespace MySurvivalGame.Game.UI.Scripts
                 playerInventory.OnInventoryChanged -= RefreshInventoryDisplay;
             }
             // ADDED: Unsubscribe from PlayerStaminaComponent event
-            if (playerStamina != null && staminaBar != null) 
+            if (playerStamina != null && staminaBar != null)
             {
                 playerStamina.OnStaminaChanged -= UpdateStaminaUI;
             }
@@ -488,9 +488,9 @@ namespace MySurvivalGame.Game.UI.Scripts
                 if (maxStamina > 0)
                 {
                     staminaBar.Value = currentStamina / maxStamina; // ProgressBar Value is 0 to 1
-                    staminaBar.Visibility = Visibility.Visible; 
+                    staminaBar.Visibility = Visibility.Visible;
                 }
-                else 
+                else
                 {
                     staminaBar.Value = 0;
                     staminaBar.Visibility = Visibility.Collapsed;

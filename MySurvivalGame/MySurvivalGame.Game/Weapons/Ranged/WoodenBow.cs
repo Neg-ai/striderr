@@ -1,7 +1,7 @@
 using Stride.Engine;
 using Stride.Core.Mathematics;
 using MySurvivalGame.Game.Player;       // For PlayerInventoryComponent, PlayerInput
-using MySurvivalGame.Data.Items;        // MODIFIED: For ItemData
+using MySurvivalGame.Game.Data.Items;        // MODIFIED: For ItemData
 using MySurvivalGame.Game.Core;         // For DamageType
 using MySurvivalGame.Game.Audio;        // For GameSoundManager
 
@@ -14,7 +14,7 @@ namespace MySurvivalGame.Game.Weapons.Ranged
 
         public override void OnEquip(Entity owner) // owner is the player entity
         {
-            base.OnEquip(owner); 
+            base.OnEquip(owner);
             playerInventory = owner?.Get<PlayerInventoryComponent>();
 
             if (ConfiguredItemData?.WeaponData != null)
@@ -50,7 +50,7 @@ namespace MySurvivalGame.Game.Weapons.Ranged
                 Log.Error($"{itemName}: PlayerInventoryComponent not found. Cannot check/consume ammo.");
                 return;
             }
-            
+
             UpdateAmmoCountFromInventory(this.Entity.GetParent()); // Refresh ammo count before trying to consume
 
             string requiredAmmoId = ConfiguredItemData.WeaponData.RequiredAmmoItemID;
@@ -73,9 +73,9 @@ namespace MySurvivalGame.Game.Weapons.Ranged
                     Matrix cameraWorldMatrix = camera.Entity.Transform.WorldMatrix;
                     Vector3 raycastStart = cameraWorldMatrix.TranslationVector;
                     Vector3 raycastDirection = cameraWorldMatrix.Forward;
-                    
+
                     // Stats from ConfiguredItemData
-                    float range = ConfiguredItemData.WeaponData.Range; 
+                    float range = ConfiguredItemData.WeaponData.Range;
                     float damage = ConfiguredItemData.WeaponData.Damage * CalculateChargeBonus(chargeTime); // Example charge bonus
 
                     var simulation = this.GetSimulation();
@@ -145,10 +145,10 @@ namespace MySurvivalGame.Game.Weapons.Ranged
         private CameraComponent GetCamera()
         {
             // Assumes this script is on a weapon entity child of the player entity
-            var playerEntity = this.Entity?.GetParent(); 
+            var playerEntity = this.Entity?.GetParent();
             return playerEntity?.Get<PlayerInput>()?.Camera;
         }
-        
+
         // BaseBowWeapon handles PrimaryAction to start charging, and OnPrimaryActionReleased to call ReleaseArrow.
         // So, PrimaryAction in WoodenBow itself might not be needed if charge mechanic is in BaseBowWeapon.
         // public override void PrimaryAction() { /* Potentially start drawing the bow */ }

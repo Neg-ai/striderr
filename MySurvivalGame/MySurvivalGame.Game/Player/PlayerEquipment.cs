@@ -5,9 +5,9 @@ using Stride.Engine;
 using Stride.Engine.Events; 
 using MySurvivalGame.Game.Weapons; 
 using MySurvivalGame.Game.Player;   
-using MySurvivalGame.Data.Items; // MODIFIED: For ItemData, ItemStack, ItemDatabase
-using MySurvivalGame.Game.World; 
-using Stride.Physics; 
+using MySurvivalGame.Game.Data.Items; // MODIFIED: For ItemData, ItemStack, ItemDatabase
+using MySurvivalGame.Game.World;
+using Stride.Physics;
 using Stride.Core.Mathematics;
 using System; // For Activator
 using System.Collections.Generic; // For Dictionary
@@ -17,7 +17,7 @@ namespace MySurvivalGame.Game.Player
     public class PlayerEquipment : ScriptComponent
     {
         public BaseWeapon CurrentWeapon { get; private set; }
-        private int equippedSlotIndex = -1; 
+        private int equippedSlotIndex = -1;
         private PlayerInventoryComponent playerInventory;
         private PlayerStaminaComponent playerStamina; // ADDED
 
@@ -27,12 +27,12 @@ namespace MySurvivalGame.Game.Player
         private const float ResourceGatherStaminaCost = 10f; // ADDED for consistency with actions
 
         // TODO: Populate this map with ItemID -> ScriptType mappings
-        private Dictionary<string, Type> itemScriptMap = new Dictionary<string, Type>(); 
+        private Dictionary<string, Type> itemScriptMap = new Dictionary<string, Type>();
 
         private EventReceiver<bool> shootEventReceiver;
         private EventReceiver<bool> reloadEventReceiver;
         private EventReceiver shootReleasedEventReceiver; 
-        private EventReceiver interactReceiver; 
+        private EventReceiver interactReceiver;
         private EventReceiver<int> hotbarSlotSelectedReceiver; // For hotbar selection
 
         public override void Start()
@@ -96,13 +96,13 @@ namespace MySurvivalGame.Game.Player
                 UnequipCurrentWeapon(); // Unequip if out of bounds index means nothing selected
                 return;
             }
-            
+
             // If trying to equip the same slot that's already equipped, do nothing (or re-equip if desired)
             // For now, let's allow re-equipping to refresh the item, might be useful.
             // if (slotIndex == equippedSlotIndex && CurrentWeapon != null)
             // {
             //     Log.Info($"PlayerEquipment: Slot {slotIndex} is already equipped.");
-            //     return; 
+            //     return;
             // }
 
             UnequipCurrentWeapon(); // Unequip previous item
@@ -139,7 +139,7 @@ namespace MySurvivalGame.Game.Player
                 {
                     Log.Info($"PlayerEquipment: Found script type '{weaponScriptType.Name}' for item '{itemToEquip.ItemName}'.");
                     var newWeaponEntity = new Entity("EquippedItemInstance"); // Name for debugging
-                    
+
                     CurrentWeapon = (BaseWeapon)Activator.CreateInstance(weaponScriptType);
                     if (CurrentWeapon == null)
                     {
@@ -147,9 +147,9 @@ namespace MySurvivalGame.Game.Player
                         equippedSlotIndex = -1; // Failed to equip
                         return;
                     }
-                    
-                    newWeaponEntity.Add(CurrentWeapon); 
-                    this.Entity.AddChild(newWeaponEntity); 
+
+                    newWeaponEntity.Add(CurrentWeapon);
+                    this.Entity.AddChild(newWeaponEntity);
 
                     CurrentWeapon.Configure(itemToEquip); // Pass ItemData to the weapon script
                     CurrentWeapon.OnEquip(this.Entity); // Notify script it's equipped
@@ -189,11 +189,11 @@ namespace MySurvivalGame.Game.Player
                 // Log.Info($"PlayerEquipment: Item '{stack.Item.ItemName}' in slot {equippedSlotIndex} is not a weapon or tool. Cannot perform secondary action.");
                 return;
             }
-            
+
             if (stack.CurrentDurability <= 0)
             {
                 Log.Info($"PlayerEquipment: Item '{stack.Item.ItemName}' is broken! Durability: {stack.CurrentDurability}. Cannot perform secondary action.");
-                return; 
+                return;
             }
 
             // Stamina Check for SecondaryAction
@@ -212,8 +212,8 @@ namespace MySurvivalGame.Game.Player
             {
                 Log.Info($"PlayerEquipment: Performing SecondaryAction for '{stack.Item.ItemName}' using script {CurrentWeapon.GetType().Name}. Durability before: {stack.CurrentDurability}");
                 CurrentWeapon.SecondaryAction(); // Delegate to the weapon script
-                
-                float durabilityCost = 0.5f; 
+
+                float durabilityCost = 0.5f;
                 playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
             }
             else
@@ -249,9 +249,9 @@ namespace MySurvivalGame.Game.Player
                 PrimaryAction();
             }
 
-            if (shootReleasedEventReceiver.TryReceive()) 
+            if (shootReleasedEventReceiver.TryReceive())
             {
-                if (CurrentWeapon is BaseBowWeapon bowWeapon) 
+                if (CurrentWeapon is BaseBowWeapon bowWeapon)
                 {
                     bowWeapon.OnPrimaryActionReleased();
                 }
@@ -288,7 +288,7 @@ namespace MySurvivalGame.Game.Player
             if (stack.CurrentDurability <= 0)
             {
                 Log.Info($"PlayerEquipment: Item '{stack.Item.ItemName}' is broken! Durability: {stack.CurrentDurability}");
-                return; 
+                return;
             }
 
             // Stamina Check for PrimaryAction
@@ -299,7 +299,7 @@ namespace MySurvivalGame.Game.Player
             else if (!playerStamina.TryConsumeStamina(PrimaryActionStaminaCost))
             {
                 Log.Info($"PlayerEquipment: Not enough stamina for PrimaryAction. Need: {PrimaryActionStaminaCost}, Have: {playerStamina.CurrentStamina}");
-                // GameSoundManager.PlaySound("Player_OutOfStamina", this.Entity.Transform.WorldMatrix.TranslationVector); 
+                // GameSoundManager.PlaySound("Player_OutOfStamina", this.Entity.Transform.WorldMatrix.TranslationVector);
                 return; // Do not proceed
             }
 
@@ -327,9 +327,9 @@ namespace MySurvivalGame.Game.Player
             if (CurrentWeapon != null)
             {
                 Log.Info($"PlayerEquipment: Performing PrimaryAction for '{stack.Item.ItemName}' (Weapon/Tool) using script {CurrentWeapon.GetType().Name}. Durability before: {stack.CurrentDurability}");
-                CurrentWeapon.PrimaryAction(); 
-                
-                float durabilityCost = 1.0f; 
+                CurrentWeapon.PrimaryAction();
+
+                float durabilityCost = 1.0f;
                 playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
             }
             else
@@ -360,7 +360,7 @@ namespace MySurvivalGame.Game.Player
                 // Log.Info("PlayerEquipment: No weapon equipped to reload.");
             }
         }
-        
+
         private void AttemptResourceGather()
         {
             if (equippedSlotIndex == -1)
@@ -397,7 +397,7 @@ namespace MySurvivalGame.Game.Player
                 return;
             }
 
-            var camera = playerInput.Camera; 
+            var camera = playerInput.Camera;
             var simulation = this.GetSimulation();
             if (simulation == null)
             {
@@ -408,7 +408,7 @@ namespace MySurvivalGame.Game.Player
             Matrix cameraWorldMatrix = camera.Entity.Transform.WorldMatrix;
             Vector3 raycastStart = cameraWorldMatrix.TranslationVector;
             Vector3 raycastForward = cameraWorldMatrix.Forward;
-            float gatherRange = 2.0f; 
+            float gatherRange = 2.0f;
 
             var hitResult = simulation.Raycast(raycastStart, raycastStart + raycastForward * gatherRange);
 
@@ -423,14 +423,14 @@ namespace MySurvivalGame.Game.Player
                     
                     var harvestedItem = resourceNode.HitNode(currentToolData, playerInventory); // Pass ItemData or null
 
-                    if (harvestedItem != null) 
+                    if (harvestedItem != null)
                     {
                         Log.Info($"PlayerEquipment: Successfully harvested '{harvestedItem.ItemName}' using '{currentToolData?.ItemName ?? "Hands"}'.");
                         
                         if (currentToolData != null && (currentToolData.Type == ItemType.Tool || currentToolData.Type == ItemType.Weapon))
                         {
                             // Durability cost for successful gather with a tool
-                            float durabilityCost = 1.0f; 
+                            float durabilityCost = 1.0f;
                             playerInventory.DecreaseDurability(equippedSlotIndex, durabilityCost);
                             // Log.Info($"PlayerEquipment: Tool '{currentToolData.ItemName}' durability after gathering: {playerInventory.GetItemStack(equippedSlotIndex)?.CurrentDurability}.");
                         }
@@ -438,7 +438,7 @@ namespace MySurvivalGame.Game.Player
                 }
             }
         }
-        
+
         // REMOVED: Old EquipWeapon(BaseWeapon newWeapon) - replaced by EquipItemFromSlot
         // REMOVED: Old EquipItem(MockInventoryItem itemToEquip) - replaced by EquipItemFromSlot
         // REMOVED: Old TriggerCurrentWeaponPrimary() - logic moved into PrimaryAction()

@@ -1,8 +1,8 @@
 using Stride.Engine;
 using Stride.Core; // For [DataMember]
-using MySurvivalGame.Data.Items; // MODIFIED: For ItemData, ItemStack, ToolStats
+using MySurvivalGame.Game.Data.Items; // MODIFIED: For ItemData, ItemStack, ToolStats
 using MySurvivalGame.Game.Player; // For PlayerInventoryComponent
-using MySurvivalGame.Game.Audio; 
+using MySurvivalGame.Game.Audio;
 
 namespace MySurvivalGame.Game.World
 {
@@ -59,7 +59,7 @@ namespace MySurvivalGame.Game.World
             bool toolCompatible = false;
             string usedToolTypeName = "Hands"; // Default to hands
 
-            if (ToolCategory == RequiredToolCategory.Any) 
+            if (ToolCategory == RequiredToolCategory.Any)
             {
                 toolCompatible = true;
                 if (toolData != null) usedToolTypeName = toolData.Type.ToString();
@@ -70,7 +70,7 @@ namespace MySurvivalGame.Game.World
                 // If a specific tool is equipped but node needs Hand, it's incompatible unless tool is 'Generic'
                 if (hittingToolStack != null && toolData != null && toolData.Type != ToolStats.ToolSpecificType.Generic)
                 {
-                    toolCompatible = false; 
+                    toolCompatible = false;
                 }
                  if (toolData != null) usedToolTypeName = toolData.Type.ToString();
 
@@ -82,7 +82,7 @@ namespace MySurvivalGame.Game.World
                 {
                     case RequiredToolCategory.Axe:
                         // Assuming Hatchet is the enum value for axe-like tools
-                        toolCompatible = (toolData.Type == ToolStats.ToolSpecificType.Hatchet); 
+                        toolCompatible = (toolData.Type == ToolStats.ToolSpecificType.Hatchet);
                         break;
                     case RequiredToolCategory.Pickaxe:
                         toolCompatible = (toolData.Type == ToolStats.ToolSpecificType.Pickaxe);
@@ -110,7 +110,7 @@ namespace MySurvivalGame.Game.World
             }
 
             int actualHarvestAmount = System.Math.Min(HarvestAmountPerHit, TotalResources);
-            
+
             // Bonus from tool - Example: increase actualHarvestAmount based on toolData.Efficiency or BonusMultiplier
             if (toolData != null && toolData.BonusResource != ToolStats.SpecialBonusResource.None)
             {
@@ -151,7 +151,7 @@ namespace MySurvivalGame.Game.World
             {
                 TotalResources -= quantityAdded; // Only subtract what was actually taken
                 Log.Info($"Harvested {quantityAdded} of '{harvestedItemID}' from '{this.Entity.Name}' with {usedToolTypeName}. Remaining node resources: {TotalResources}");
-                
+
                 string hitSoundName = "Hit_Generic";
                 switch (NodeType)
                 {

@@ -5,11 +5,11 @@
 using Stride.Engine;
 // Potentially using MySurvivalGame.Game.Core for ITargetable if needed later
 // Potentially using MySurvivalGame.Game.Items for MaterialType if needed later
-using MySurvivalGame.Data.Items; // Required for ItemData
+using MySurvivalGame.Game.Data.Items; // Required for ItemData
 
 namespace MySurvivalGame.Game.Weapons
 {
-    public abstract class BaseWeapon : ScriptComponent 
+    public abstract class BaseWeapon : ScriptComponent
     {
         public ItemData ConfiguredItemData { get; protected set; }
 

@@ -1,6 +1,6 @@
 using Stride.Core; // For DataContract and DataMember
 
-namespace MySurvivalGame.Data.Items
+namespace MySurvivalGame.Game.Data.Items
 {
     [DataContract]
     public class ToolStats
@@ -53,7 +53,7 @@ namespace MySurvivalGame.Data.Items
         public float BonusMultiplier { get; set; } = 1.0f;
 
         /// <summary>
-        /// Damage dealt when used as an improvised weapon. 
+        /// Damage dealt when used as an improvised weapon.
         /// Tools are generally not primary weapons but can still do some damage.
         /// </summary>
         [DataMember]

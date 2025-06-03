@@ -5,7 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MySurvivalGame.Data.Items; // For ItemData, ItemStack, ItemDatabase
+using MySurvivalGame.Game.Data.Items; // For ItemData, ItemStack, ItemDatabase
 using Stride.Core; // For DataMemberIgnore attribute if needed by ScriptComponent
 using Stride.Engine;
 
@@ -104,7 +104,7 @@ namespace MySurvivalGame.Game.Player
                     }
                 }
             }
-            
+
             int quantityAdded = quantity - quantityRemainingToAdd;
             if (quantityRemainingToAdd > 0)
             {
@@ -263,7 +263,7 @@ namespace MySurvivalGame.Game.Player
             if (indexA == indexB) return true; // Nothing to swap
 
             Log.Info($"PlayerInventory: Swapping slot {indexA} ('{InventorySlots[indexA]?.Item?.ItemName ?? "Empty"}') with slot {indexB} ('{InventorySlots[indexB]?.Item?.ItemName ?? "Empty"}').");
-            
+
             ItemStack temp = InventorySlots[indexA];
             InventorySlots[indexA] = InventorySlots[indexB];
             InventorySlots[indexB] = temp;

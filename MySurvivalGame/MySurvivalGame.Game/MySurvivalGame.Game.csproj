@@ -8,6 +8,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>MySurvivalGame.Game</RootNamespace>
+    <AssemblyName>MySurvivalGame.Game</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

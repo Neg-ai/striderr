@@ -1,6 +1,6 @@
 using Stride.Core; // For DataContract and DataMember
 
-namespace MySurvivalGame.Data.Items
+namespace MySurvivalGame.Game.Data.Items
 {
     [DataContract]
     public class WeaponStats
@@ -33,7 +33,7 @@ namespace MySurvivalGame.Data.Items
         public float Range { get; set; }
 
         /// <summary>
-        /// ItemID of the ammunition required for this weapon. 
+        /// ItemID of the ammunition required for this weapon.
         /// Null or empty if no ammunition is required (e.g., melee weapons).
         /// </summary>
         [DataMember]
@@ -52,8 +52,8 @@ namespace MySurvivalGame.Data.Items
         [DataMember]
         public string SpecialNotes { get; set; }
 
-        // It might be useful to add more specific structured properties later, 
-        // such as enums for damage types (e.g., Piercing, Explosive, Energy) 
+        // It might be useful to add more specific structured properties later,
+        // such as enums for damage types (e.g., Piercing, Explosive, Energy)
         // or flags for capabilities (e.g., FullAuto, ScopeAvailable).
         // For now, SpecialNotes covers these.
     }

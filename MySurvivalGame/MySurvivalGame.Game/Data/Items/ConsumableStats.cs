@@ -1,6 +1,6 @@
 using Stride.Core; // For DataContract and DataMember
 
-namespace MySurvivalGame.Data.Items
+namespace MySurvivalGame.Game.Data.Items
 {
     [DataContract]
     public class ConsumableStats
@@ -30,7 +30,7 @@ namespace MySurvivalGame.Data.Items
         public float StaminaChange { get; set; } = 0f;
 
         /// <summary>
-        /// Duration of any temporary effects (buffs/debuffs) in seconds. 
+        /// Duration of any temporary effects (buffs/debuffs) in seconds.
         /// 0 if the effect is instant.
         /// </summary>
         [DataMember]

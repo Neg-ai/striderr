@@ -8,9 +8,9 @@
 
 using Stride.Engine;
 using Stride.Engine.Events; 
-// REMOVED: using MySurvivalGame.Game.Items; 
-// REMOVED: using MySurvivalGame.Game.UI.Scripts; 
-// REMOVED: using System.Linq; 
+// REMOVED: using MySurvivalGame.Game.Items;
+// REMOVED: using MySurvivalGame.Game.UI.Scripts;
+// REMOVED: using System.Linq;
 
 namespace MySurvivalGame.Game.Player
 {
@@ -19,12 +19,12 @@ namespace MySurvivalGame.Game.Player
         // The HotbarItems array is removed. PlayerInventoryComponent is the source of truth.
         // Hotbar slots are assumed to be the first N slots of the PlayerInventoryComponent.
         // Example: If hotbar has 8 slots, these are indices 0-7 in PlayerInventoryComponent.InventorySlots.
-        
+
         private EventReceiver<int> hotbarSlotSelectedReceiver; 
         private PlayerEquipment playerEquipment;
         // private PlayerInventoryComponent playerInventory; // Not strictly needed if PlayerEquipment handles consumable logic
 
-        // The UpdateHotbarSlot method is removed as PlayerInventoryComponent.OnInventoryChanged 
+        // The UpdateHotbarSlot method is removed as PlayerInventoryComponent.OnInventoryChanged
         // will trigger InventoryPanelScript.RefreshInventoryDisplay(), which updates all UI slots including hotbar.
 
         public override void Start()
@@ -60,7 +60,7 @@ namespace MySurvivalGame.Game.Player
                 // If the item is a consumable, PlayerEquipment.PrimaryAction (when triggered) should handle its use.
                 Log.Info($"PlayerHotbarManager: Hotbar slot UI index {selectedHotbarIndex + 1} (data index {selectedHotbarIndex}) selected. Relaying to PlayerEquipment.");
                 playerEquipment.EquipItemFromSlot(selectedHotbarIndex);
-                
+
                 // The old logic for directly consuming items here is removed.
                 // PlayerEquipment.PrimaryAction() will now check if the equipped/selected item is a consumable
                 // and then call playerInventory.ConsumeItemBySlot(selectedHotbarIndex, 1).

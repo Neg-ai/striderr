@@ -1,6 +1,6 @@
 using Stride.Core; // For DataContract and DataMember
 
-namespace MySurvivalGame.Data.Items
+namespace MySurvivalGame.Game.Data.Items
 {
     [DataContract]
     public class AmmunitionStats
@@ -33,7 +33,7 @@ namespace MySurvivalGame.Data.Items
         /// </summary>
         [DataMember]
         public float DamageModifier { get; set; } = 0f;
-        
+
         /// <summary>
         /// Describes any special properties of the ammunition (e.g., "Tracer", "Armor Piercing", "Ricochet").
         /// </summary>

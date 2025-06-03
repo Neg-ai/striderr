@@ -1,6 +1,6 @@
 using Stride.Core; // For DataContract and DataMember
 
-namespace MySurvivalGame.Data.Items
+namespace MySurvivalGame.Game.Data.Items
 {
     [DataContract]
     public class ItemStack
@@ -31,7 +31,7 @@ namespace MySurvivalGame.Data.Items
                 // Ideally, MaxDurability would come from ItemData.ToolData.MaxDurability or ItemData.WeaponData.MaxDurability
                 // Since those fields don't exist from the previous task, we'll use a default.
                 // This can be refined later if MaxDurability is added to ToolStats/WeaponStats.
-                CurrentDurability = DefaultMaxDurability; 
+                CurrentDurability = DefaultMaxDurability;
             }
             else
             {

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MySurvivalGame.Data.Items
+namespace MySurvivalGame.Game.Data.Items
 {
     /// <summary>
     /// TEMPORARY Item Database for testing purposes.
@@ -92,7 +92,7 @@ namespace MySurvivalGame.Data.Items
             Definitions.TryGetValue(itemID, out var item);
             // Could return a clone if ItemData instances are mutable and shared,
             // but for now, assuming ItemData is treated as immutable after definition.
-            return item; 
+            return item;
         }
     }
 }

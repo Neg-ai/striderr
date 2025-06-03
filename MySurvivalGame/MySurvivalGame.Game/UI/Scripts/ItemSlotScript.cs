@@ -9,9 +9,9 @@ using Stride.UI.Controls; // For ImageElement, TextBlock, ProgressBar
 using Stride.UI.Events;   // For PointerEventArgs
 using Stride.UI.Panels;   // For Grid (if RootPanel is needed)
 using Stride.Input;       // For Input (used in InventoryPanelScript, good to have consistent usings)
-using MySurvivalGame.Data.Items; // MODIFIED: For ItemStack, ItemData
+using MySurvivalGame.Game.Data.Items; // MODIFIED: For ItemStack, ItemData
 
-namespace MySurvivalGame.Game.UI.Scripts 
+namespace MySurvivalGame.Game.UI.Scripts
 {
     public class ItemSlotScript : UIScript
     {
@@ -19,10 +19,10 @@ namespace MySurvivalGame.Game.UI.Scripts
         public TextBlock QuantityText { get; set; }
         public ProgressBar DurabilityBar { get; set; }
         
-        public UIElement RootElement { get; private set; } 
+        public UIElement RootElement { get; private set; }
 
         private bool isDragging = false;
-        public Vector2 DragOffset { get; private set; } 
+        public Vector2 DragOffset { get; private set; }
         public static ItemSlotScript CurrentlyDraggedSlot { get; private set; }
         public ItemStack CurrentItemStack { get; private set; } // MODIFIED: Property name and type
 
@@ -135,14 +135,14 @@ namespace MySurvivalGame.Game.UI.Scripts
         }
         
         // Helper methods to get current visual data
-        public Texture GetIconTexture() 
+        public Texture GetIconTexture()
         {
             // This would need to access the loaded texture if ItemIconImage.Source is set.
             // For now, it's challenging without direct Texture reference in CurrentItemStack.Item
             return (ItemIconImage?.Source as SpriteFromTexture)?.Texture;
         }
         public int GetQuantity() => CurrentItemStack?.Quantity ?? 0;
-        public float? GetDurabilityNormalized() 
+        public float? GetDurabilityNormalized()
         {
             if (CurrentItemStack != null && (CurrentItemStack.Item.Type == ItemType.Tool || CurrentItemStack.Item.Type == ItemType.Weapon))
             {
@@ -155,7 +155,7 @@ namespace MySurvivalGame.Game.UI.Scripts
 
         public void ClearSlot()
         {
-            CurrentItemStack = null; 
+            CurrentItemStack = null;
             if (ItemIconImage != null)
             {
                 ItemIconImage.Source = null;

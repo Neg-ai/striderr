@@ -1,7 +1,7 @@
 using Stride.Engine;
 using Stride.Core.Mathematics; // For Matrix, Vector3 for camera access
 using MySurvivalGame.Game.Player; 
-using MySurvivalGame.Data.Items;  // MODIFIED: For ItemData
+using MySurvivalGame.Game.Data.Items;  // MODIFIED: For ItemData
 using MySurvivalGame.Game.Audio; // ADDED for GameSoundManager
 
 namespace MySurvivalGame.Game.Weapons.Ranged
@@ -28,7 +28,7 @@ namespace MySurvivalGame.Game.Weapons.Ranged
                     Matrix cameraWorldMatrix = camera.Entity.Transform.WorldMatrix;
                     Vector3 raycastStart = cameraWorldMatrix.TranslationVector;
                     Vector3 raycastDirection = cameraWorldMatrix.Forward;
-                    float range = ConfiguredItemData.WeaponData.Range; 
+                    float range = ConfiguredItemData.WeaponData.Range;
                     
                     ShootRaycast(raycastStart, raycastDirection, range); // Assuming ShootRaycast uses ConfiguredItemData.WeaponData.Damage
                 }
@@ -55,7 +55,7 @@ namespace MySurvivalGame.Game.Weapons.Ranged
                 Log.Warning($"{itemName}: RequiredAmmoItemID not defined in ConfiguredItemData.WeaponData. Cannot reload.");
                 return;
             }
-            
+
             UpdateReserveAmmoFromInventory(this.Entity.GetParent()); // Ensure reserve ammo count is current
 
             int ammoNeeded = ClipSize - ActualCurrentAmmoInClip;
@@ -107,7 +107,7 @@ namespace MySurvivalGame.Game.Weapons.Ranged
         {
             base.OnUnequip(owner); // Call base to ensure logging or other base logic
             Log.Info($"{ConfiguredItemData?.ItemName ?? this.Entity?.Name ?? "Pistol"}: Unequipped.");
-            playerInventory = null; 
+            playerInventory = null;
             // State (ActualCurrentAmmoInClip, ActualReserveAmmo) is lost when unequipped.
             // To persist this, it would need to be saved back to an inventory system that can hold instance-specific data,
             // or the weapon entity itself would need to be persisted/pooled instead of recreated.
@@ -149,7 +149,7 @@ namespace MySurvivalGame.Game.Weapons.Ranged
             if (ammoSlots.Count == 0) return false;
 
             // Sort slots to consume from earliest first (optional, but can be consistent)
-            // ammoSlots.Sort(); 
+            // ammoSlots.Sort();
 
             foreach (var slotIndex in ammoSlots)
             {
@@ -164,7 +164,7 @@ namespace MySurvivalGame.Game.Weapons.Ranged
                     }
                 }
             }
-            
+
             bool success = remainingToConsume <= 0;
             if(success)
             {
@@ -180,7 +180,7 @@ namespace MySurvivalGame.Game.Weapons.Ranged
 
         private CameraComponent GetCamera()
         {
-            var playerEntity = this.Entity?.GetParent(); 
+            var playerEntity = this.Entity?.GetParent();
             return playerEntity?.Get<PlayerInput>()?.Camera;
         }
     }

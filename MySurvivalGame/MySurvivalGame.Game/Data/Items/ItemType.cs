@@ -1,4 +1,4 @@
-namespace MySurvivalGame.Data.Items
+namespace MySurvivalGame.Game.Data.Items
 {
     public enum ItemType
     {
