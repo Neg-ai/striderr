@@ -32,6 +32,14 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SamplesAssetPackage", "Samp
 		../Packs/SamplesAssetPackage/SamplesAssetPackage.sdpkg = ../Packs/SamplesAssetPackage/SamplesAssetPackage.sdpkg
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mannequinModel", "..\Packs\mannequinModel\mannequinModel.csproj", "{7318F996-2924-4D84-ABF2-95CA62328BF2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrototypingBlocks", "..\Packs\PrototypingBlocks\PrototypingBlocks.csproj", "{5F572812-BA96-4CAC-A3E6-0D6A2CB028E1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SamplesAssetPackage", "..\Packs\SamplesAssetPackage\SamplesAssetPackage.csproj", "{EC8447C0-3CF3-48FC-B66A-B7E0F514D0B6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VFXPackage", "..\Packs\VFXPackage\VFXPackage.csproj", "{483EB441-6D87-427A-9AA7-E28CD2E31713}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		AppStore|Any CPU = AppStore|Any CPU

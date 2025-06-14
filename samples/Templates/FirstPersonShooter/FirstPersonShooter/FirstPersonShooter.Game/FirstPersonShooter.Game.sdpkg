@@ -10,6 +10,8 @@ Meta:
 AssetFolders:
     -   Path: !dir ../Assets
     -   Path: !dir Effects
+    -   Path: !dir ../Assets
+    -   Path: !dir C:/Users/user/OneDrive/Documents/GitHub/striderr/samples/Templates/FirstPersonShooter/FirstPersonShooter/Assets
 ResourceFolders:
     - !dir ../Resources
 OutputGroupDirectories: {}
