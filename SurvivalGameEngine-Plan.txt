@@ -1,0 +1,301 @@
+# STRIDE3D SURVIVAL ENGINE IMPLEMENTATION PLAN
+{VERSION} 2.1.0  
+{PLAN_ID} PLAN-ARKRUST-STRIDE-021  
+{LAST_UPDATED} 2025-05-21T23:20:00-04:00  
+
+---
+
+## 1. CORE PLAYER SYSTEMS (PHASE 1A: 14 DAYS)
+### 1.1 Enhanced FPS Controller (4 Days)
+- Implement prone/swim states using animation blending
+- Add stamina drain formula: \( S_{drain} = 0.25 + (W_{weight} \times 0.1) \)
+- Inverse kinematics for tool interactions using Stride.Animation.IK
+- Underwater movement physics with buoyancy: \( F_b = \rho \times V \times g \)
+- Camera bob and FOV changes for sprint/prone/swim
+- Contextual footstep sounds (Stride.Audio)
+
+### 1.2 Survival Metrics (3 Days)
+- Hunger system with metabolism rate: \( 1.5\%/min \) base
+- Thirst decay with environmental modifiers (desert +25%)
+- Hypothermia system using particle-based visual frost
+- Disease/injury states (bleeding, infection, broken bones)
+- UI for health, stamina, hunger, thirst, temperature
+
+### 1.3 Advanced Inventory (4 Days)
+- Grid-based storage with weight constraints: \( W_{max} = 35 + (S_{strength} \times 2) \)
+- Hotbar quick-swap system with radial menu
+- Item degradation: \( D_{rate} = 1 - (0.01 \times M_{hardness}) \)
+- Stack splitting, drag-drop, and context menus
+- Equipment slots for armor, tools, weapons
+
+### 1.4 Crafting Framework (3 Days)
+- Blueprint discovery using ScriptComponent triggers
+- Workbench integration with particle-based crafting VFX
+- Material requirement tables (wood:4, stone:8 per wall)
+- Crafting queue, cancel, and speed modifiers
+- Unlock system for recipes (progression/XP)
+
+---
+
+## 2. BUILDING ENGINE (PHASE 2A: 21 DAYS)  
+### 2.1 Structural Core (6 Days)
+- Grid snapping with 6-axis alignment (ARK-style)
+- Collision layers for snap validation
+- Ghost material system using Stride.Graphics shaders
+- Placement preview with color feedback (valid/invalid)
+- Multi-user build permissions (ownership, tribe/clan)
+
+### 2.2 Material Tiers (5 Days)
+- Thatch: 200HP, flammable, 0.5x weather resistance
+- Stone: 800HP, explosive resistance modifier
+- Metal: 2000HP, conducts electricity
+- Advanced (e.g., Tek): 4000HP, immune to most damage except plasma/explosives
+- Material-specific VFX (sparks, fire, crumbling)
+
+### 2.3 Underwater Systems (5 Days)
+- Vacuum chamber pressure mechanics: \( P_{max} = 100 + (D_{depth} \times 10) \)
+- Moonpool entry/exit using Trigger volumes
+- Flooding simulation with particle fluid VFX
+- Opaque/transparent toggling per wall panel
+- Oxygen management for underwater rooms
+
+### 2.4 Defense Infrastructure (5 Days)
+- Turret target acquisition using NavigationComponent
+- Tesla coil chain reactions: \( D_{chain} = 3m \times L_{level} \)
+- Force field shader with plasma distortion
+- Spike walls, bear traps, flame/plasma turrets
+- Turret ammo management and power draw
+
+---
+
+## 3. COMBAT SYSTEMS (PHASE 3A: 18 DAYS)
+### 3.1 Ballistic Engine (6 Days)
+- Projectile drop: \( Y_{pos} = V_0t + \frac{1}{2}gt^2 \)
+- Material penetration tables (wood:0.8x, metal:0.2x)
+- Ricochet probability: \( P_r = \theta \times 0.02 \)
+- Hit scan for energy/plasma weapons
+- Suppression and camera shake effects
+
+### 3.2 Weapon Arsenal (6 Days)
+- Revolver: 45 damage, 6 round cylinder
+- Modern pistol, bolt action sniper, semi-auto sniper, assault rifle
+- Double barrel and pump-action shotguns
+- Plasma rifle: 15 dps AOE with charge-up
+- Rail gun, grenade launcher, grenades, C4, rocket launcher
+- Portable mining drill: \( 3.5 \times R_{yield} \) with overheating
+- Weapon attachments: scopes, silencers, extended mags
+
+### 3.3 AI Systems (6 Days)
+- Wildlife navigation using NavMesh
+- Turret target prioritization (player > structures)
+- Patrol patterns using Spline paths
+- Hostile NPCs with group tactics
+- Flee/aggro state machines
+
+---
+
+## 4. WORLD SYSTEMS (PHASE 4A: 12 DAYS)
+### 4.1 Resource Network (4 Days)
+- Node respawn algorithm: \( T_{respawn} = 300 \times R_{rarity} \)
+- Mining drill depletion mechanics
+- Resource stacking logic with weight limits
+- Dynamic resource distribution (biomes, events)
+
+### 4.2 Dynamic Weather (4 Days)
+- Snow accumulation using ParticleSystem
+- Rain corrosion: \( 0.1\%/min \) thatch decay
+- Storm audio using SpatializedSound
+- Lightning strikes with random fire chance
+- Fog and wind affecting projectile accuracy
+
+### 4.3 Power Grid (4 Days)
+- Generator fuel consumption: \( 1L/min \times P_{load} \)
+- Wireless transmission: \( R_{max} = 15m \times G_{tier} \)
+- Circuit overload explosions
+- Solar/wind generator options
+- Power storage (batteries, capacitors)
+- Power grid UI overlay
+
+---
+
+## 5. OPTIMIZATION (PHASE 5A: 9 DAYS)
+### 5.1 LOD Systems (3 Days)
+- Structure detail reduction beyond 50m
+- Particle culling at medium distances
+- AI behavior throttling
+
+### 5.2 Memory Management (3 Days)
+- Chunk-based asset loading
+- Pooling system for projectiles
+- Dynamic texture streaming
+
+### 5.3 Multiplayer Sync (3 Days)
+- State replication using Starbreach netcode
+- Prediction for building actions
+- Anti-cheat validators
+- Server-authoritative physics for critical actions
+
+---
+
+## 6. ADVANCED SYSTEMS (PHASE 6A: 18 DAYS)
+### 6.1 Irrigation & Farming (6 Days)
+- Water pipes, taps, and reservoirs with pressure simulation
+- Crop plots with growth stages, fertilizer, and hydration
+- Automated irrigation pumps (power required)
+- Greenhouse effect (glass structures boost growth)
+- Water quality affecting plant health
+
+### 6.2 Electrical Networks (6 Days)
+- Cable routing with junction boxes
+- Power usage tracking per device
+- Circuit breakers and overload protection
+- EMP grenades disable electronics temporarily
+- Visual feedback for powered/unpowered states
+
+### 6.3 Raiding & Base Defense (6 Days)
+- C4 and rocket launcher damage tables
+- Structure decay/repair mechanics
+- Offline raid protection (configurable)
+- Alarm systems and camera feeds
+- Raid log for player notifications
+
+---
+
+## 7. USER INTERFACE & EXPERIENCE (PHASE 7A: 9 DAYS)
+### 7.1 HUD & Menus (3 Days)
+- Modular HUD: health, stamina, inventory, hotbar
+- Context-sensitive prompts (building, interacting)
+- Customizable keybinds
+
+### 7.2 Map & Compass (3 Days)
+- World map with fog of war
+- GPS/compass for navigation
+- Placeable map markers
+
+### 7.3 Accessibility (3 Days)
+- Colorblind modes
+- Scalable UI
+- Subtitles and audio cues
+
+---
+
+## 8. TESTING & QA (PHASE 8A: CONTINUOUS)
+### 8.1 Unit Testing
+- Automated tests for core systems
+- Regression testing after major changes
+
+### 8.2 Integration Testing
+- Multiplayer stress tests
+- Save/load consistency checks
+
+### 8.3 Playtesting
+- Internal alpha/beta playtests
+- Feedback-driven balancing
+
+---
+
+## 9. DOCUMENTATION & MODDING SUPPORT (PHASE 9A: 5 DAYS)
+### 9.1 Developer Docs
+- Inline code documentation
+- API usage examples
+
+### 9.2 Modding API
+- Data-driven definitions for items, recipes, structures
+- Scriptable events/hooks for mods
+
+---
+
+## 10. DEPLOYMENT & PATCHING (PHASE 10A: 4 DAYS)
+### 10.1 Build Automation
+- Continuous Integration setup
+- Automated asset packaging
+
+### 10.2 Patch Management
+- Hotfix pipeline for rapid bug fixes
+- Versioned savegame migration
+
+---
+
+## IMPLEMENTATION REFERENCES
+- [1] Stride3D Manual: https://doc.stride3d.net/latest/en/manual/index.html
+- [2] Stride3D API Docs: https://doc.stride3d.net/latest/en/api/index.html
+- [3] Stride3D FPS Template
+- [4] Stride3D Particle System
+- [5] Stride3D Shader System
+- [6] Stride3D Animation System
+- [7] Stride3D Weather/Environment
+- [8] Starbreach Demo: https://github.com/stride3d/Starbreach
+- [9] Stride3D Navigation/AI
+- [10] Stride3D Audio
+
+---
+
+## PROGRESS TRACKING
+- Each phase and subsystem tracked in PROGRESS.md
+- All Curson.exe prompts update progress files after execution
+- Each feature marked with estimated and actual hours, blockers, and notes
+
+---
+
+## APPENDICES
+### A. Weapon Stats Table
+| Weapon               | Damage | Fire Rate | Range | Special         |
+|----------------------|--------|-----------|-------|-----------------|
+| Pick                 | 15     | 0.5/s     | Melee | Mining bonus    |
+| Hatchet              | 20     | 0.6/s     | Melee | Wood bonus      |
+| Mining Drill         | 10     | 1.5/s     | Melee | Area mining     |
+| Revolver             | 45     | 0.8/s     | 30m   | High recoil     |
+| Modern Pistol        | 35     | 2.0/s     | 25m   | Fast reload     |
+| Bolt Sniper          | 90     | 0.5/s     | 150m  | High accuracy   |
+| Semi-auto Sniper     | 70     | 1.0/s     | 100m  |                |
+| Assault Rifle        | 30     | 8.0/s     | 60m   | Full-auto       |
+| Double Barrel Shotgun| 60x2   | 0.5/s     | 10m   | Wide spread     |
+| Shotgun              | 40     | 1.2/s     | 15m   |                |
+| Plasma Rifle         | 15     | 5.0/s     | 50m   | AOE, shield dmg |
+| Rail Gun             | 120    | 0.2/s     | 200m  | Piercing        |
+| Grenade Launcher     | 100    | 0.8/s     | 40m   | Explosive       |
+| Grenade              | 120    | -         | 15m   | Throwable       |
+| C4                   | 300    | -         | -     | Timed/detonator |
+| Rocket Launcher      | 250    | 0.5/s     | 60m   | Splash damage   |
+
+---
+
+### B. Structure Material Table
+| Material     | HP    | Weakness           | Strength                |
+|--------------|-------|--------------------|-------------------------|
+| Thatch       | 200   | Fire, rain         | Cheap, fast to build    |
+| Wood         | 400   | Fire, axes         | Easy to upgrade         |
+| Stone        | 800   | Explosives         | Weatherproof            |
+| Metal        | 2000  | Plasma, C4         | Conducts electricity    |
+| Advanced     | 4000  | Plasma, rockets    | Immune to small arms    |
+| Glass        | 600   | Melee, explosives  | Greenhouse effect       |
+
+---
+
+### C. Defensive Structure Table
+| Defense Type       | Damage/Effect    | Power Use | Special                      |
+|--------------------|------------------|-----------|------------------------------|
+| Spike Wall         | 40/sec contact   | 0         | Bleed effect                 |
+| Bear Trap          | Immobilize 10s   | 0         | Single-use                   |
+| Turret (Rifle)     | 50/shot          | 5/min     | Ammo required                |
+| Heavy Turret       | 80/shot          | 10/min    | Armor-piercing               |
+| Plasma Turret      | 30/shot (AOE)    | 15/min    | Ignores shields              |
+| Flame Turret       | 20/sec (burn)    | 8/min     | Area denial                  |
+| Tesla Coil         | 80 (shock)       | 20/min    | Chain to 3 targets           |
+| Force Field        | Blocks all but C4| 50/min    | Only explosive/plasma damage |
+
+---
+
+### D. Power & Irrigation Table
+| Device             | Power Use | Range/Capacity | Notes                       |
+|--------------------|-----------|----------------|-----------------------------|
+| Gas Generator      | 20/min    | 50m cable      | Needs fuel                  |
+| Field Generator    | 40/min    | 30m radius     | Wireless power              |
+| Battery            | -         | 1000 units     | Stores excess power         |
+| Pump               | 10/min    | 100m pipe      | Moves water uphill          |
+| Reservoir          | -         | 2000L          | Stores water                |
+| Sprinkler          | 2/min     | 8m radius      | Irrigates crops             |
+
+---
+
+## END OF PLAN
