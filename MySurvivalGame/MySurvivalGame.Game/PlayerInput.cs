@@ -24,6 +24,13 @@ namespace MySurvivalGame.Game
         public static readonly EventKey<int> SwitchLockOnTargetEventKey = new EventKey<int>(); // ADDED: For Lock-On Target Switching
         public static readonly EventKey<int> HotbarSlotSelectedEventKey = new EventKey<int>(); // ADDED: For hotbar selection
         public static readonly EventKey InteractEventKey = new EventKey(); // ADDED: For interaction
+        public static readonly EventKey LightAttackEventKey = new EventKey();
+        public static readonly EventKey HeavyAttackEventKey = new EventKey();
+        public static readonly EventKey DodgeEventKey = new EventKey();
+        public static readonly EventKey BlockEventKey = new EventKey();
+        public static readonly EventKey PrimaryAction_Held_EventKey = new EventKey();
+        public static readonly EventKey PrimaryAction_Released_EventKey = new EventKey();
+
 
         // public static readonly EventKey<bool> ShootEventKey = new EventKey<bool>();
         // public static readonly EventKey<bool> ReloadEventKey = new EventKey<bool>();
@@ -55,10 +62,15 @@ namespace MySurvivalGame.Game
         public List<Keys> KeysJump { get; set; } = new List<Keys>() { Keys.Space }; // ADDED: For Jump
         public List<Keys> KeysToggleMeleeMode { get; set; } = new List<Keys>() { Keys.V }; // ADDED: For Melee Mode Toggle
         public List<Keys> KeysToggleLockOn { get; set; } = new List<Keys>() { Keys.MiddleMouseButton, Keys.R3 }; // ADDED: For Lock-On
-        public List<Keys> KeysSwitchLockOnTargetNext { get; set; } = new List<Keys>() { Keys.MouseWheelUp }; // ADDED: For Lock-On Target Switching (MouseWheelUp for next)
-        public List<Keys> KeysSwitchLockOnTargetPrevious { get; set; } = new List<Keys>() { Keys.MouseWheelDown }; // ADDED: For Lock-On Target Switching (MouseWheelDown for previous)
+        public List<Keys> KeysSwitchLockOnTargetNext { get; set; } = new List<Keys>(); // MODIFIED: Mouse wheel handled directly
+        public List<Keys> KeysSwitchLockOnTargetPrevious { get; set; } = new List<Keys>(); // MODIFIED: Mouse wheel handled directly
         // Gamepad for target switching (RightShoulder/LeftShoulder) will be handled if we add specific gamepad logic or map them to abstract buttons.
         // For now, MouseWheel is primary. If R/L Shoulder are needed, they can be added to these lists or as separate bindings.
+        public List<Keys> KeysLightAttack { get; set; } = new List<Keys>() { Keys.X };
+        public List<Keys> KeysHeavyAttack { get; set; } = new List<Keys>() { Keys.C };
+        public List<Keys> KeysDodge { get; set; } = new List<Keys>() { Keys.LeftControl };
+        public List<Keys> KeysBlock { get; set; } = new List<Keys>() { Keys.MouseButtonRight };
+
 
         // public List<Keys> KeysReload { get; set; } = new List<Keys>() { Keys.R };
         public List<Keys> KeysSwitchCamera { get; set; } = new List<Keys>() { Keys.T }; // MODIFIED: Uncommented
@@ -68,6 +80,8 @@ namespace MySurvivalGame.Game
         // public List<Keys> KeysCycleBuildableNext { get; set; } = new List<Keys>() { Keys.PageUp };
         // public List<Keys> KeysCycleBuildablePrev { get; set; } = new List<Keys>() { Keys.PageDown };
         // public List<Keys> KeysDebugDestroy { get; set; } = new List<Keys>() { Keys.K };
+
+        private bool isPrimaryActionKeyDown = false; // Track hold state for primary action
 
         public PlayerInput()
         {
@@ -198,45 +212,101 @@ namespace MySurvivalGame.Game
                 {
                     ToggleLockOnEventKey.Broadcast();
                 }
-                if (KeysSwitchLockOnTargetNext.Any(key => Input.IsKeyPressed(key))) // Note: MouseWheelUp might be tricky as IsKeyPressed
+
+                // Mouse Wheel for Lock-On Target Switching
+                if (Input.MouseWheelDelta > 0)
                 {
-                    // For mouse wheel, checking delta is better. Input.MouseWheelDelta is a float.
-                    // This simple IsKeyPressed might not work as expected for MouseWheelUp/Down directly.
-                    // A more robust way for mouse wheel:
-                    // if (Input.MouseWheelDelta > 0) SwitchLockOnTargetEventKey.Broadcast(1);
-                    // if (Input.MouseWheelDelta < 0) SwitchLockOnTargetEventKey.Broadcast(-1);
-                    // However, to stick to the List<Keys> pattern for now:
+                    SwitchLockOnTargetEventKey.Broadcast(1);
+                }
+                else if (Input.MouseWheelDelta < 0)
+                {
+                    SwitchLockOnTargetEventKey.Broadcast(-1);
+                }
+
+                // Gamepad RightShoulder/LeftShoulder for target switching
+                // Using IsGamepadButtonReleasedAny to ensure it fires once per press
+                if (Input.IsGamepadButtonReleasedAny(0, GamepadButton.RightShoulder))
+                {
+                     SwitchLockOnTargetEventKey.Broadcast(1);
+                }
+                if (Input.IsGamepadButtonReleasedAny(0, GamepadButton.LeftShoulder))
+                {
+                     SwitchLockOnTargetEventKey.Broadcast(-1);
+                }
+                // Allow keyboard to also switch targets if lists are populated
+                if (KeysSwitchLockOnTargetNext.Any(key => Input.IsKeyPressed(key)))
+                {
                     SwitchLockOnTargetEventKey.Broadcast(1);
                 }
                 if (KeysSwitchLockOnTargetPrevious.Any(key => Input.IsKeyPressed(key)))
                 {
                     SwitchLockOnTargetEventKey.Broadcast(-1);
                 }
+            }
 
-                // More robust mouse wheel handling
-                if (Input.MouseWheelDelta > 0)
+            // Light Attack (Primary Action) - Initial Press, Held, Released
+            // Initial Press (existing logic for LightAttackEventKey)
+            if (KeysLightAttack.Any(key => Input.IsKeyPressed(key)) || Input.IsGamepadButtonPressedAny(0, GamepadButton.RightTrigger))
+            {
+                LightAttackEventKey.Broadcast();
+            }
+
+            // Held / Released Logic for Primary Action (KeysLightAttack and RightTrigger)
+            bool primaryActionCurrentlyPressed = false;
+            foreach (var key in KeysLightAttack)
+            {
+                if (Input.IsKeyDown(key))
                 {
-                    if (!KeysSwitchLockOnTargetNext.Contains(Keys.MouseWheelUp)) // Avoid double broadcast if already handled by IsKeyPressed
-                    {
-                         SwitchLockOnTargetEventKey.Broadcast(1);
-                    }
+                    primaryActionCurrentlyPressed = true;
+                    break;
                 }
-                else if (Input.MouseWheelDelta < 0)
+            }
+            if (!primaryActionCurrentlyPressed && Input.GetGamePad(0) != null) // Check gamepad only if keyboard not pressed
+            {
+                 if (Input.IsGamepadButtonDownAny(0, GamepadButton.RightTrigger)) // Assuming Right Trigger for primary action hold
+                 {
+                    primaryActionCurrentlyPressed = true;
+                 }
+            }
+
+            if (primaryActionCurrentlyPressed)
+            {
+                if (!isPrimaryActionKeyDown)
                 {
-                    if (!KeysSwitchLockOnTargetPrevious.Contains(Keys.MouseWheelDown)) // Avoid double broadcast
-                    {
-                        SwitchLockOnTargetEventKey.Broadcast(-1);
-                    }
+                    // This is the frame the key/button was pressed.
+                    // LightAttackEventKey is already broadcast by IsKeyPressed/IsGamepadButtonPressedAny.
+                    isPrimaryActionKeyDown = true;
+                    // Potentially broadcast a specific "PrimaryAction_Down_EventKey" here if needed,
+                    // but LightAttackEventKey might already serve this purpose.
                 }
-                // Gamepad RightShoulder/LeftShoulder for target switching (example)
-                if (Input.IsGamepadButtonDownAny(0, GamepadButton.RightShoulder) && Input.IsGamepadButtonReleasedAny(0, GamepadButton.RightShoulder)) // Pressed this frame
+                PrimaryAction_Held_EventKey.Broadcast(); // Broadcast every frame it's held
+            }
+            else // Not currently pressed
+            {
+                if (isPrimaryActionKeyDown)
                 {
-                     SwitchLockOnTargetEventKey.Broadcast(1);
+                    // Was pressed, now released
+                    PrimaryAction_Released_EventKey.Broadcast();
+                    isPrimaryActionKeyDown = false;
                 }
-                if (Input.IsGamepadButtonDownAny(0, GamepadButton.LeftShoulder) && Input.IsGamepadButtonReleasedAny(0, GamepadButton.LeftShoulder)) // Pressed this frame
-                {
-                     SwitchLockOnTargetEventKey.Broadcast(-1);
-                }
+            }
+
+            // Heavy Attack
+            if (KeysHeavyAttack.Any(key => Input.IsKeyPressed(key)))
+            {
+                HeavyAttackEventKey.Broadcast();
+            }
+
+            // Dodge
+            if (KeysDodge.Any(key => Input.IsKeyPressed(key)) || Input.IsGamepadButtonReleasedAny(0, GamepadButton.B))
+            {
+                DodgeEventKey.Broadcast();
+            }
+
+            // Block
+            if (KeysBlock.Any(key => Input.IsKeyPressed(key)) || Input.IsGamepadButtonReleasedAny(0, GamepadButton.LeftTrigger))
+            {
+                BlockEventKey.Broadcast();
             }
             
             // Debug Destroy logic commented out

@@ -18,26 +18,62 @@ namespace MySurvivalGame.Game
         // Conceptual names for animations that would be in TargetAnimationComponent.Animations dictionary
         // For this test, we'll use "RifleIdle" for both base idle and additive upper body,
         // and "WalkForward" for movement.
-        private const string IdleAnim = "RifleIdle";       // MODIFIED: Conceptual name
-        private const string WalkAnim = "WalkForward";     // MODIFIED: Conceptual name
+        // MODIFIED: Renamed animation constants as per subtask
+        private const string IdleAnim = "Idle";
+        private const string WalkAnim = "Walk";
+        private const string RunAnim = "Run";
+
+        // Conceptual names for action animations
+        private const string JumpStartAnim = "Jump_Start"; // Example
+        private const string LightAttackAnim = "Attack_Light"; // Example
+        private const string HeavyAttackAnim = "Attack_Heavy"; // Example
+        private const string DodgeForwardAnim = "Dodge_Forward"; // Example
+        private const string BlockIdleAnim = "Block_Idle"; // Example for blocking stance
+
+        public PlayerController PlayerController { get; set; }
+
+        // Event Receivers for player actions
+        private EventReceiver jumpEventReceiver;
+        private EventReceiver lightAttackReceiver;
+        private EventReceiver heavyAttackReceiver;
+        private EventReceiver dodgeReceiver;
+        private EventReceiver blockEventReceiver; // Renamed from blockReceiver to avoid conflict with PlayerController's one if any confusion
 
         public override void Start()
         {
             // Ensure components are linked, preferrably via the editor
-            if (TargetAnimationComponent == null) // MODIFIED: Changed to TargetAnimationComponent
+            if (TargetAnimationComponent == null)
             {
-                TargetAnimationComponent = Entity.Get<AnimationComponent>(); // MODIFIED: Changed to TargetAnimationComponent
-                if (TargetAnimationComponent == null) // MODIFIED: Changed to TargetAnimationComponent
+                TargetAnimationComponent = Entity.Get<AnimationComponent>();
+                if (TargetAnimationComponent == null)
                     Log.Error("PlayerAnimationController: TargetAnimationComponent not found on entity or not assigned.");
             }
 
-            if (Character == null)
+            // CharacterComponent is expected on the parent entity ("Player")
+            var parentEntity = Entity.GetParent();
+            if (Character == null && parentEntity != null)
             {
-                // CharacterComponent is expected on the parent entity ("Player")
-                Character = Entity.GetParent()?.Get<CharacterComponent>();
+                Character = parentEntity.Get<CharacterComponent>();
                 if (Character == null)
                     Log.Error("PlayerAnimationController: CharacterComponent not found on parent entity or not assigned.");
             }
+
+            if (PlayerController == null && parentEntity != null)
+            {
+                PlayerController = parentEntity.Get<PlayerController>();
+                if (PlayerController == null)
+                    Log.Warning("PlayerAnimationController: PlayerController not found on parent entity. Run animation speed threshold and stamina checks might not work.");
+            }
+
+            // Initialize EventReceivers
+            // These assume PlayerInput is broadcasting these events globally or accessible if they were instance based.
+            // PlayerInput.JumpEventKey etc. are static.
+            jumpEventReceiver = new EventReceiver(PlayerInput.JumpEventKey);
+            lightAttackReceiver = new EventReceiver(PlayerInput.LightAttackEventKey);
+            heavyAttackReceiver = new EventReceiver(PlayerInput.HeavyAttackEventKey);
+            dodgeReceiver = new EventReceiver(PlayerInput.DodgeEventKey);
+            blockEventReceiver = new EventReceiver(PlayerInput.BlockEventKey);
+
 
             // --- Initial Animation State & Investigation into Layering/Masking ---
             // Stride's AnimationComponent plays AnimationClips. A PlayingAnimation is an instance of an AnimationClip being played.
@@ -133,57 +169,74 @@ namespace MySurvivalGame.Game
                 return;
 
             bool isMoving = Character.Velocity.LengthSquared() > 0.1f;
-
-            // --- Conceptual Animation Blending Logic ---
-            // This logic assumes "WalkForward" would animate lower body (or be full body base)
-            // and "RifleIdle" would animate upper body additively.
+            float runSpeedThresholdSquared = PlayerController != null ? (PlayerController.MaxRunSpeed * 0.75f) * (PlayerController.MaxRunSpeed * 0.75f) : (5.0f * 0.75f) * (5.0f * 0.75f); // Fallback if no controller
+            bool isRunning = isMoving && Character.Velocity.LengthSquared() > runSpeedThresholdSquared;
 
             var currentBaseAnimation = TargetAnimationComponent.PlayingAnimations.FirstOrDefault(pa => pa.Key == "BaseLayer");
+            string targetBaseAnimName = IdleAnim;
 
             if (isMoving)
             {
-                // If "WalkForward" is available and not already the primary base animation
-                if (TargetAnimationComponent.Animations.ContainsKey(WalkAnim))
-                {
-                    if (currentBaseAnimation == null || currentBaseAnimation.Name != WalkAnim || !currentBaseAnimation.Enabled)
-                    {
-                        currentBaseAnimation?.Stop(); // Stop whatever was playing on base layer
-                        TargetAnimationComponent.Play(WalkAnim, new AnimationPlayParameters { Loop = true, BlendOperation = AnimationBlendOperation.Linear, Key = "BaseLayer" });
-                        // Log.Info("Switched to WalkForward (conceptual)");
-                    }
-                }
-                else
-                {
-                    // Log.WarningOnce("Player is moving but 'WalkForward' animation is not available.");
-                }
-            }
-            else // Player is Idle
-            {
-                // If "RifleIdle" is available and not already the primary base animation
-                if (TargetAnimationComponent.Animations.ContainsKey(IdleAnim))
-                {
-                     if (currentBaseAnimation == null || currentBaseAnimation.Name != IdleAnim || !currentBaseAnimation.Enabled)
-                    {
-                        currentBaseAnimation?.Stop(); // Stop whatever was playing on base layer
-                        TargetAnimationComponent.Play(IdleAnim, new AnimationPlayParameters { Loop = true, BlendOperation = AnimationBlendOperation.Linear, Key = "BaseLayer" });
-                        // Log.Info("Switched to RifleIdle (conceptual base)");
-                    }
-                }
-                else
-                {
-                    // Log.WarningOnce("'RifleIdle' (for base) animation is not available for idle state.");
-                }
+                targetBaseAnimName = isRunning ? RunAnim : WalkAnim;
             }
 
-            // Ensure upper body additive animation ("RifleIdle") is playing.
-            // This was started in Start() and should be looping. If it somehow stopped, restart it.
-            var currentUpperAnimation = TargetAnimationComponent.PlayingAnimations.FirstOrDefault(pa => pa.Key == "UpperLayer");
-            if (TargetAnimationComponent.Animations.ContainsKey(IdleAnim))
+            if (TargetAnimationComponent.Animations.ContainsKey(targetBaseAnimName))
             {
-                 if(currentUpperAnimation == null || !currentUpperAnimation.Enabled) {
-                    TargetAnimationComponent.Play(IdleAnim, new AnimationPlayParameters { Loop = true, BlendOperation = AnimationBlendOperation.Additive, Key = "UpperLayer" });
+                if (currentBaseAnimation == null || currentBaseAnimation.Name != targetBaseAnimName || !currentBaseAnimation.Enabled)
+                {
+                    currentBaseAnimation?.Stop();
+                    TargetAnimationComponent.Play(targetBaseAnimName, new AnimationPlayParameters { Loop = true, BlendOperation = AnimationBlendOperation.Linear, Key = "BaseLayer" });
+                    // Log.Info($"BaseLayer switched to {targetBaseAnimName}");
+                }
+            }
+            else
+            {
+                // Fallback to Idle if Walk/Run not found, or Walk if Run not found.
+                if (targetBaseAnimName == RunAnim && !TargetAnimationComponent.Animations.ContainsKey(RunAnim))
+                {
+                    targetBaseAnimName = WalkAnim; // Try walk
+                }
+                if (targetBaseAnimName == WalkAnim && !TargetAnimationComponent.Animations.ContainsKey(WalkAnim))
+                {
+                     targetBaseAnimName = IdleAnim; // Try Idle
+                }
+                // Play fallback if different from current
+                 if (TargetAnimationComponent.Animations.ContainsKey(targetBaseAnimName) && (currentBaseAnimation == null || currentBaseAnimation.Name != targetBaseAnimName || !currentBaseAnimation.Enabled))
+                 {
+                    currentBaseAnimation?.Stop();
+                    TargetAnimationComponent.Play(targetBaseAnimName, new AnimationPlayParameters { Loop = true, BlendOperation = AnimationBlendOperation.Linear, Key = "BaseLayer" });
+                 }
+                // Log.WarningOnce($"{targetBaseAnimName} animation not found.");
+            }
+
+            // Handle Action Events & Upper Body / Action Layer
+            HandleActionAnimations();
+
+            // Ensure upper body additive animation (e.g. Idle or BlockIdle) is playing if no other action is overriding it.
+            // This part needs to be smarter: if an action animation is playing on "ActionLayer" or "UpperLayer", it might override this.
+            // For now, the old logic for upper body idle is kept but might be superseded by block/action logic.
+            var currentUpperAnimation = TargetAnimationComponent.PlayingAnimations.FirstOrDefault(pa => pa.Key == "UpperLayer");
+            bool isActionPlayingOnUpper = TargetAnimationComponent.PlayingAnimations.Any(pa => pa.Key == "ActionLayer" && pa.Enabled);
+
+
+            if (!isActionPlayingOnUpper && PlayerController != null && PlayerController.isBlocking)
+            {
+                 if (TargetAnimationComponent.Animations.ContainsKey(BlockIdleAnim)) {
+                    if(currentUpperAnimation == null || currentUpperAnimation.Name != BlockIdleAnim || !currentUpperAnimation.Enabled) {
+                        currentUpperAnimation?.Stop();
+                        TargetAnimationComponent.Play(BlockIdleAnim, new AnimationPlayParameters { Loop = true, BlendOperation = AnimationBlendOperation.Linear, Key = "UpperLayer" }); // Or Additive if it's designed that way
+                    }
+                 } else {
+                    // Log.WarningOnce($"{BlockIdleAnim} not found for blocking stance.");
+                    // Fallback to normal upper idle if block anim not present
+                    PlayUpperIdleIfNotPlaying(currentUpperAnimation);
                  }
             }
+            else if (!isActionPlayingOnUpper) // Not blocking, no other action on upper layer
+            {
+                 PlayUpperIdleIfNotPlaying(currentUpperAnimation);
+            }
+
 
             // --- Further Investigation Notes (already present in Start(), reiterated here for clarity in report) ---
             // Stride's `AnimationComponent` plays `AnimationClip` assets.
@@ -193,6 +246,64 @@ namespace MySurvivalGame.Game
             // to restrict a full-body clip to certain bones for a specific playback instance without custom `IAnimationBlender` development.
             // Current blending will rely on `AnimationBlendOperation.Additive` for upper body layers,
             // assuming the animation clips are authored appropriately (either as true additive clips or pre-split).
+        }
+
+        private void PlayUpperIdleIfNotPlaying(PlayingAnimation currentUpperAnimation)
+        {
+            if (TargetAnimationComponent.Animations.ContainsKey(IdleAnim)) // Assuming IdleAnim can serve as upper body additive base
+            {
+                 if(currentUpperAnimation == null || currentUpperAnimation.Name != IdleAnim || !currentUpperAnimation.Enabled)
+                 {
+                    currentUpperAnimation?.Stop(); // Stop whatever was on upper
+                    TargetAnimationComponent.Play(IdleAnim, new AnimationPlayParameters { Loop = true, BlendOperation = AnimationBlendOperation.Additive, Key = "UpperLayer" });
+                 }
+            }
+        }
+
+        private void HandleActionAnimations()
+        {
+            // Using a general "ActionLayer". Could be "UpperLayer" if actions are upper-body only.
+            // Additive blending allows overlaying on existing movement. Linear would replace.
+            // Non-looping for one-shot actions.
+
+            if (jumpEventReceiver.TryReceive())
+            {
+                Log.Info($"Attempting to play animation: {JumpStartAnim}");
+                if (TargetAnimationComponent.Animations.ContainsKey(JumpStartAnim))
+                {
+                    TargetAnimationComponent.Play(JumpStartAnim, new AnimationPlayParameters { BlendOperation = AnimationBlendOperation.Additive, Key = "ActionLayer", Loop = false });
+                } else { Log.Warning($"{JumpStartAnim} animation not found."); }
+            }
+
+            if (lightAttackReceiver.TryReceive())
+            {
+                Log.Info($"Attempting to play animation: {LightAttackAnim}");
+                if (TargetAnimationComponent.Animations.ContainsKey(LightAttackAnim))
+                {
+                    TargetAnimationComponent.Play(LightAttackAnim, new AnimationPlayParameters { BlendOperation = AnimationBlendOperation.Additive, Key = "ActionLayer", Loop = false });
+                } else { Log.Warning($"{LightAttackAnim} animation not found."); }
+            }
+
+            if (heavyAttackReceiver.TryReceive())
+            {
+                Log.Info($"Attempting to play animation: {HeavyAttackAnim}");
+                if (TargetAnimationComponent.Animations.ContainsKey(HeavyAttackAnim))
+                {
+                    TargetAnimationComponent.Play(HeavyAttackAnim, new AnimationPlayParameters { BlendOperation = AnimationBlendOperation.Additive, Key = "ActionLayer", Loop = false });
+                } else { Log.Warning($"{HeavyAttackAnim} animation not found."); }
+            }
+
+            if (dodgeReceiver.TryReceive())
+            {
+                Log.Info($"Attempting to play animation: {DodgeForwardAnim}");
+                if (TargetAnimationComponent.Animations.ContainsKey(DodgeForwardAnim))
+                {
+                    TargetAnimationComponent.Play(DodgeForwardAnim, new AnimationPlayParameters { BlendOperation = AnimationBlendOperation.Linear, Key = "ActionLayer", Loop = false }); // Linear to override movement
+                } else { Log.Warning($"{DodgeForwardAnim} animation not found."); }
+            }
+
+            // Block animation is handled in main Update loop based on PlayerController.isBlocking state
+            // because it's a sustained state, not a one-shot event here.
         }
     }
 }

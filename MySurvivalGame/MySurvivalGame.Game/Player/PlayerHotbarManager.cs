@@ -20,6 +20,8 @@ namespace MySurvivalGame.Game.Player
         private EventReceiver<int> hotbarSlotSelectedReceiver; 
         private InventoryPanelScript inventoryPanelScript; // ADDED
 
+        public static readonly EventKey<int> ActiveHotbarSlotChangedEventKey = new EventKey<int>();
+
         /// <summary>
         /// Updates a specific slot in the hotbar with a new item.
         /// This method is typically called by the inventory UI system after a drag-and-drop operation
@@ -88,14 +90,52 @@ namespace MySurvivalGame.Game.Player
 
                     if (itemInSlot != null)
                     {
-                        Log.Info($"PlayerHotbarManager: Slot {selectedSlotIndex + 1} selected. Item: '{itemInSlot.Name}', Type: '{itemInSlot.ItemType}', EquipmentType: '{itemInSlot.CurrentEquipmentType}'.");
+                        Log.Info($"PlayerHotbarManager: Slot {selectedSlotIndex + 1} selected. Item: '{itemInSlot.Name}', Type: '{itemInSlot.ItemType}', IsThrowable: {itemInSlot.IsThrowable}, EquipmentType: '{itemInSlot.CurrentEquipmentType}'.");
 
-                        if (itemInSlot.CurrentEquipmentType == MySurvivalGame.Game.Items.EquipmentType.Weapon || 
-                            itemInSlot.CurrentEquipmentType == MySurvivalGame.Game.Items.EquipmentType.Tool)
+                        if (itemInSlot.IsThrowable && itemInSlot is WeaponToolData throwableData && playerEquipment != null)
+                        {
+                            Log.Info($"PlayerHotbarManager: Attempting to throw item: '{itemInSlot.Name}'.");
+                            bool thrown = playerEquipment.AttemptThrowItem(throwableData);
+                            if (thrown)
+                            {
+                                if (playerInventory != null)
+                                {
+                                    bool consumed = playerInventory.TryConsumeQuantity(itemInSlot.UniqueId, 1);
+                                    if (consumed)
+                                    {
+                                        var itemAfterConsumption = playerInventory.AllPlayerItems.FirstOrDefault(i => i.UniqueId == itemInSlot.UniqueId);
+                                        if (itemAfterConsumption == null || itemAfterConsumption.Quantity == 0)
+                                        {
+                                            HotbarItems[selectedSlotIndex] = null;
+                                            Log.Info($"PlayerHotbarManager: Throwable item '{itemInSlot.Name}' stack depleted and removed from hotbar slot {selectedSlotIndex + 1}.");
+                                        }
+                                        else
+                                        {
+                                            // Update quantity on the hotbar item reference if it's still the same instance
+                                            // or if a new instance was created by inventory, this might need more robust handling
+                                            // For now, assuming MockInventoryItem is a class and HotbarItems[selectedSlotIndex] refers to the instance in playerInventory.AllPlayerItems
+                                            HotbarItems[selectedSlotIndex].Quantity = itemAfterConsumption.Quantity;
+                                             if(HotbarItems[selectedSlotIndex].Quantity <= 0) HotbarItems[selectedSlotIndex] = null; // Double check
+                                        }
+                                        inventoryPanelScript?.RefreshInventoryDisplay();
+                                    }
+                                    else
+                                    {
+                                        Log.Warning($"PlayerHotbarManager: Throw action succeeded for '{itemInSlot.Name}', but failed to consume item from inventory.");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                Log.Warning($"PlayerHotbarManager: AttemptThrowItem failed for '{itemInSlot.Name}'.");
+                            }
+                        }
+                        else if (itemInSlot.CurrentEquipmentType == MySurvivalGame.Game.Items.EquipmentType.Weapon ||
+                                 itemInSlot.CurrentEquipmentType == MySurvivalGame.Game.Items.EquipmentType.Tool)
                         {
                             playerEquipment?.EquipItem(itemInSlot);
                         }
-                        else if (itemInSlot.CurrentEquipmentType == MySurvivalGame.Game.Items.EquipmentType.Consumable) // ADDED: Consumable logic
+                        else if (itemInSlot.CurrentEquipmentType == MySurvivalGame.Game.Items.EquipmentType.Consumable)
                         {
                             Log.Info($"PlayerHotbarManager: Attempting to use Consumable: '{itemInSlot.Name}'.");
                             if (playerInventory != null)
@@ -135,6 +175,9 @@ namespace MySurvivalGame.Game.Player
                 {
                     Log.Warning($"PlayerHotbarManager: Received invalid slot index {selectedSlotIndex} from HotbarSlotSelectedEventKey.");
                 }
+                // Broadcast the event regardless of whether the slot was valid or item was null,
+                // as the UI might want to clear selection or select an empty slot.
+                ActiveHotbarSlotChangedEventKey.Broadcast(selectedSlotIndex);
             }
         }
 

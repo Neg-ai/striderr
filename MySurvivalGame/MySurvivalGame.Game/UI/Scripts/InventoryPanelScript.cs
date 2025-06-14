@@ -51,6 +51,9 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
         private const float hoverDelay = 0.5f; // Seconds before tooltip appears
 
         private PlayerHotbarManager playerHotbarManager; // ADDED: For linking
+        private EventReceiver<int> activeHotbarSlotChangedReceiver; // ADDED: For hotbar selection visuals
+        private Color defaultHotbarSlotColor = new Color(50, 50, 50, 150); // Example default, assuming slots have a background
+        private Color selectedHotbarSlotColor = new Color(200, 200, 100, 200); // Example selected
 
 
         public override void Start()
@@ -103,7 +106,7 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
             if (inventoryGrid != null) InitializeInventoryGrid(numberOfSlots: 48); // 6 rows * 8 columns
             if (hotbarPanel != null) InitializeHotbar(numberOfSlots: 8);
             
-            UpdatePlayerStats(currentHealth: 100, maxHealth: 100, currentWeight: 10, maxWeight: 50); // Mock data
+            // UpdatePlayerStats(currentHealth: 100, maxHealth: 100, currentWeight: 10, maxWeight: 50); // Mock data removed, will be set after playerInventory is fetched
             // PopulateWithMockData(); // MODIFIED: Commented out or removed
 
             // MODIFIED: Find PlayerInventoryComponent and add test items
@@ -114,23 +117,33 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
                 if (playerInventory != null)
                 {
                     // Add test items using the component's method only if the inventory is currently empty
-                    if (!playerInventory.AllPlayerItems.Any()) 
+                    // This population is now handled by PlayerInventoryComponent.Start() itself, including weights.
+                    // InventoryPanelScript should primarily reflect the state of PlayerInventoryComponent.
+                    // So, the AddItem calls here are redundant if PlayerInventoryComponent.Start() populates.
+                    // For safety, keeping them but noting PlayerInventoryComponent.Start() is the source of truth for its own initial items.
+                    // If PlayerInventoryComponent.Start already added items and calculated weight, this script will pick it up.
+                    if (!playerInventory.AllPlayerItems.Any()) // This might be false if PlayerInventoryComponent.Start() already ran and added items
                     {
-                        playerInventory.AddItem(new MockInventoryItem("Wood", "Resource", "A sturdy piece of wood.", null, 30, null, 64, EquipmentType.None));
-                        playerInventory.AddItem(new MockInventoryItem("Stone", "Resource", "A common grey stone.", null, 90, null, 64, EquipmentType.None));
-                        playerInventory.AddItem(new MockInventoryItem("Iron Axe", "Tool", "A basic axe.", null, 1, 0.8f, 1, EquipmentType.Tool));
-                        playerInventory.AddItem(new MockInventoryItem("Health Potion", "Consumable", "Restores health.", null, 5, null, 10, EquipmentType.Consumable));
-                        playerInventory.AddItem(new MockInventoryItem("Old Pistol", "Weapon", "An old pistol.", null, 1, 0.5f, 1, EquipmentType.Weapon));
+                        // This block might not run if PlayerInventoryComponent.Start() already populated.
+                        // playerInventory.AddItem(new MockInventoryItem("Wood", "Resource", "A sturdy piece of wood.", null, 30, null, 64, EquipmentType.None, 0.5f));
+                        // playerInventory.AddItem(new MockInventoryItem("Stone", "Resource", "A common grey stone.", null, 90, null, 64, EquipmentType.None, 1.0f));
+                        // ... etc.
+                        // The PlayerInventoryComponent.Start() method has its own AddItem calls.
+                        // We will rely on those and the RecalculateCurrentWeight() call within PlayerInventoryComponent.
                     }
+                    // Update stats display with values from PlayerInventoryComponent
+                    UpdatePlayerStats(100, 100, playerInventory.CurrentWeight, playerInventory.MaxWeight); // Assuming 100 for health
                 }
                 else
                 {
                      Log.Error("InventoryPanelScript: PlayerInventoryComponent not found on Player entity.");
+                     UpdatePlayerStats(100, 100, 0, 50); // Fallback stats display
                 }
             }
             else
             {
                 Log.Error("InventoryPanelScript: Player entity not found for inventory.");
+                UpdatePlayerStats(100, 100, 0, 50); // Fallback stats display
             }
             
             RefreshInventoryDisplay(); 
@@ -184,6 +197,18 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
             {
                 Log.Error("InventoryPanelScript: Could not find PlayerHotbarManager component in the scene.");
             }
+
+            // Initialize EventReceiver for active hotbar slot changes
+            activeHotbarSlotChangedReceiver = new EventReceiver<int>(PlayerHotbarManager.ActiveHotbarSlotChangedEventKey);
+
+            // Set initial hotbar slot colors (all default)
+            for (int i = 0; i < hotbarSlots.Count; i++)
+            {
+                if (hotbarSlots[i]?.RootElement != null)
+                {
+                    hotbarSlots[i].RootElement.BackgroundColor = defaultHotbarSlotColor;
+                }
+            }
         }
 
         public override void Update()
@@ -220,6 +245,33 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
                 // Basic offset positioning. More advanced logic would ensure it doesn't go off-screen.
                 tooltipPanel.SetCanvasLeft(localMousePosition.X + 15); 
                 tooltipPanel.SetCanvasTop(localMousePosition.Y + 15);
+            }
+
+            // Periodically update displayed weight from PlayerInventoryComponent
+            if (playerInventory != null)
+            {
+                // Assuming health is managed elsewhere or static for this UI scope
+                UpdatePlayerStats(100, 100, playerInventory.CurrentWeight, playerInventory.MaxWeight);
+            }
+
+            // Handle Hotbar Selection Visuals
+            if (activeHotbarSlotChangedReceiver.TryReceive(out int activeSlotIndex))
+            {
+                for (int i = 0; i < hotbarSlots.Count; i++)
+                {
+                    var slotScript = hotbarSlots[i];
+                    if (slotScript?.RootElement != null) // Ensure slot and its root UI element exist
+                    {
+                        if (i == activeSlotIndex)
+                        {
+                            slotScript.RootElement.BackgroundColor = selectedHotbarSlotColor;
+                        }
+                        else
+                        {
+                            slotScript.RootElement.BackgroundColor = defaultHotbarSlotColor;
+                        }
+                    }
+                }
             }
         }
 
@@ -334,43 +386,44 @@ namespace MySurvivalGame.Game.UI.Scripts // MODIFIED: Namespace updated
             // Worker Note: Cannot load textures without specific paths or editor context.
             // Using null for textures for now. The ItemSlotScript handles null textures for the icon itself.
             // MockInventoryItem constructor also handles null texture for its Icon property.
+            // Added weight: Wood (0.5f), Stone (1.0f), Axe (1.5f), Potion (0.2f)
 
             if (inventorySlots.Count > 0 && inventorySlots[0] != null)
                 inventorySlots[0].SetItemData(null, 50, null, 
-                    new MockInventoryItem("Wood", "Resource", "A sturdy piece of wood."));
+                    new MockInventoryItem("Wood", "Resource", "A sturdy piece of wood.", null, 50, null, 64, EquipmentType.None, 0.5f));
             if (inventorySlots.Count > 1 && inventorySlots[1] != null)
                 inventorySlots[1].SetItemData(null, 100, null, 
-                    new MockInventoryItem("Stone", "Resource", "A common grey stone."));
+                    new MockInventoryItem("Stone", "Resource", "A common grey stone.", null, 100, null, 64, EquipmentType.None, 1.0f));
             if (inventorySlots.Count > 3 && inventorySlots[3] != null)
                 inventorySlots[3].SetItemData(null, 1, 0.75f, 
-                    new MockInventoryItem("Iron Axe", "Tool", "A basic axe for chopping wood. Durability: 75%"));
+                    new MockInventoryItem("Iron Axe", "Tool", "A basic axe for chopping wood. Durability: 75%", null, 1, 0.75f, 1, EquipmentType.Tool, 1.5f));
 
             if (hotbarSlots.Count > 0 && hotbarSlots[0] != null)
                 hotbarSlots[0].SetItemData(null, 1, 0.75f, 
-                    new MockInventoryItem("Iron Axe", "Tool", "A basic axe for chopping wood. Durability: 75%"));
+                    new MockInventoryItem("Iron Axe", "Tool", "A basic axe for chopping wood. Durability: 75%", null, 1, 0.75f, 1, EquipmentType.Tool, 1.5f));
             if (hotbarSlots.Count > 1 && hotbarSlots[1] != null)
                 hotbarSlots[1].SetItemData(null, 10, 0.5f, 
-                    new MockInventoryItem("Health Potion", "Consumable", "Restores a small amount of health. Durability indicates charges."));
+                    new MockInventoryItem("Health Potion", "Consumable", "Restores a small amount of health. Durability indicates charges.", null, 10, 0.5f, 10, EquipmentType.Consumable, 0.2f));
                 
             // Using null for textures for now. The ItemSlotScript handles null textures for the icon itself.
             // MockInventoryItem constructor also handles null texture for its Icon property.
 
             if (inventorySlots.Count > 0 && inventorySlots[0] != null)
                 inventorySlots[0].SetItemData(null, 50, null, 
-                    new MockInventoryItem("Wood", "Resource", "A sturdy piece of wood."));
+                    new MockInventoryItem("Wood", "Resource", "A sturdy piece of wood.", null, 50, null, 64, EquipmentType.None, 0.5f));
             if (inventorySlots.Count > 1 && inventorySlots[1] != null)
                 inventorySlots[1].SetItemData(null, 100, null, 
-                    new MockInventoryItem("Stone", "Resource", "A common grey stone."));
+                    new MockInventoryItem("Stone", "Resource", "A common grey stone.", null, 100, null, 64, EquipmentType.None, 1.0f));
             if (inventorySlots.Count > 3 && inventorySlots[3] != null)
                 inventorySlots[3].SetItemData(null, 1, 0.75f, 
-                    new MockInventoryItem("Iron Axe", "Tool", "A basic axe for chopping wood. Durability: 75%"));
+                    new MockInventoryItem("Iron Axe", "Tool", "A basic axe for chopping wood. Durability: 75%", null, 1, 0.75f, 1, EquipmentType.Tool, 1.5f));
 
             if (hotbarSlots.Count > 0 && hotbarSlots[0] != null)
                 hotbarSlots[0].SetItemData(null, 1, 0.75f, 
-                    new MockInventoryItem("Iron Axe", "Tool", "A basic axe for chopping wood. Durability: 75%"));
+                    new MockInventoryItem("Iron Axe", "Tool", "A basic axe for chopping wood. Durability: 75%", null, 1, 0.75f, 1, EquipmentType.Tool, 1.5f));
             if (hotbarSlots.Count > 1 && hotbarSlots[1] != null)
                 hotbarSlots[1].SetItemData(null, 10, 0.5f, 
-                    new MockInventoryItem("Health Potion", "Consumable", "Restores a small amount of health. Durability indicates charges."));
+                    new MockInventoryItem("Health Potion", "Consumable", "Restores a small amount of health. Durability indicates charges.", null, 10, 0.5f, 10, EquipmentType.Consumable, 0.2f));
                 
             Log.Info("InventoryPanelScript: Populated with mock item data (using MockInventoryItem instances).");
         }

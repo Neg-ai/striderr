@@ -52,6 +52,10 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
         private readonly EventReceiver toggleMeleeModeReceiver = new EventReceiver(PlayerInput.ToggleMeleeModeEventKey); // ADDED: For Melee Mode Toggle
         private readonly EventReceiver toggleLockOnReceiver; // Initialized in Start
         private readonly EventReceiver<int> switchLockOnTargetReceiver; // Initialized in Start
+        private readonly EventReceiver lightAttackReceiver;
+        private readonly EventReceiver heavyAttackReceiver;
+        private readonly EventReceiver dodgeReceiver;
+        private readonly EventReceiver blockReceiver;
 
 
         // Lock-On State Properties
@@ -64,10 +68,30 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
         [Display("Melee Combat Mode")]
         public MeleeCombatMode CurrentMeleeMode { get; private set; } = MeleeCombatMode.Standard;
 
+        // Stamina Properties
+        public float CurrentStamina { get; private set; } = 100f;
+        public float MaxStamina { get; private set; } = 100f;
+        public float StaminaRegenRate { get; set; } = 15f; // Points per second
+        public float JumpStaminaCost { get; set; } = 10f;
+        public float DodgeStaminaCost { get; set; } = 20f;
+        public float LightAttackStaminaCost { get; set; } = 15f;
+        public float HeavyAttackStaminaCost { get; set; } = 30f;
+        public float BlockStaminaDrainRate { get; set; } = 25f; // Stamina per second while holding block
+        private bool isBlocking = false;
+        private bool isRegeneratingStamina = true; // Flag to control stamina regen
+
+        public Entity PlayerCameraEntity { get; set; }
+        private PlayerInput playerInputScript; // To access KeysBlock
+
+
         public PlayerController() // Constructor to initialize readonly event receivers
         {
             toggleLockOnReceiver = new EventReceiver(PlayerInput.ToggleLockOnEventKey);
             switchLockOnTargetReceiver = new EventReceiver<int>(PlayerInput.SwitchLockOnTargetEventKey);
+            lightAttackReceiver = new EventReceiver(PlayerInput.LightAttackEventKey);
+            heavyAttackReceiver = new EventReceiver(PlayerInput.HeavyAttackEventKey);
+            dodgeReceiver = new EventReceiver(PlayerInput.DodgeEventKey);
+            blockReceiver = new EventReceiver(PlayerInput.BlockEventKey);
         }
 
         /// <summary>
@@ -83,6 +107,18 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
 
             simulation = this.GetSimulation();
             if (simulation == null) throw new ArgumentException("PlayerController requires a Simulation context.");
+
+            playerInputScript = Entity.Get<PlayerInput>();
+            if (playerInputScript == null)
+            {
+                Log.Error("PlayerController requires a PlayerInput script on the same entity to function correctly for block logic.");
+            }
+
+            PlayerCameraEntity = Entity.Scene.Entities.FirstOrDefault(e => e.Get<PlayerCamera>() != null);
+            if (PlayerCameraEntity == null)
+            {
+                Log.Warning("PlayerController could not find an entity with PlayerCamera script. Locked-on movement might be affected.");
+            }
         }
         
         /// <summary>
@@ -90,11 +126,114 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
         /// </summary>
         public override void Update()
         {
+            var deltaTime = (float)Game.UpdateTime.Elapsed.TotalSeconds;
+            isRegeneratingStamina = true; // Assume true, actions will set it to false
+
+            // Handle Block Logic (Holding and Draining)
+            // This needs to be checked early to potentially stop stamina regen
+            if (isBlocking)
+            {
+                bool blockKeyHeld = (playerInputScript != null && playerInputScript.KeysBlock.Any(key => Input.IsKeyDown(key))) || Input.IsGamepadButtonDown(0, GamepadButton.LeftTrigger);
+                if (blockKeyHeld && CurrentStamina > 0)
+                {
+                    CurrentStamina -= BlockStaminaDrainRate * deltaTime;
+                    isRegeneratingStamina = false; // No regen while actively blocking
+                    if (CurrentStamina < 0) CurrentStamina = 0;
+                }
+                else
+                {
+                    isBlocking = false;
+                    Log.Info("Block released or stamina depleted.");
+                }
+            }
+
+            // Handle incoming Block Event (to start blocking)
+            if (blockReceiver.TryReceive())
+            {
+                if (!isBlocking && CurrentStamina > 0) // Can only start blocking if not already blocking and has stamina
+                {
+                    isBlocking = true;
+                    isRegeneratingStamina = false; // No regen when initiating block
+                    Log.Info("Block Action Triggered: Started blocking.");
+                    // PlayerAnimationController will handle visuals. Stamina drain handled above.
+                }
+                else if (isBlocking)
+                {
+                    // If block key is pressed again while already blocking, stop blocking (toggle behavior for press)
+                    isBlocking = false;
+                    Log.Info("Block Action Triggered: Stopped blocking (toggle).");
+                }
+                else
+                {
+                    Log.Info("Cannot block: Already blocking or no stamina.");
+                }
+            }
+
+
             // Handle Jump
             if (jumpEvent.TryReceive())
             {
-                OnJumpRequested();
+                if (CurrentStamina >= JumpStaminaCost)
+                {
+                    CurrentStamina -= JumpStaminaCost;
+                    isRegeneratingStamina = false;
+                    OnJumpRequested();
+                    Log.Info($"Jump Action Triggered. Stamina: {CurrentStamina}");
+                }
+                else
+                {
+                    Log.Info($"Jump failed. Insufficient stamina: {CurrentStamina}/{JumpStaminaCost}");
+                }
             }
+
+            // Handle Light Attack
+            if (lightAttackReceiver.TryReceive())
+            {
+                if (CurrentStamina >= LightAttackStaminaCost)
+                {
+                    CurrentStamina -= LightAttackStaminaCost;
+                    isRegeneratingStamina = false;
+                    Log.Info($"Light Attack Action Triggered. Stamina: {CurrentStamina}");
+                    // TODO: Trigger animation, deal damage, etc.
+                }
+                else
+                {
+                    Log.Info($"Light Attack failed. Insufficient stamina: {CurrentStamina}/{LightAttackStaminaCost}");
+                }
+            }
+
+            // Handle Heavy Attack
+            if (heavyAttackReceiver.TryReceive())
+            {
+                if (CurrentStamina >= HeavyAttackStaminaCost)
+                {
+                    CurrentStamina -= HeavyAttackStaminaCost;
+                    isRegeneratingStamina = false;
+                    Log.Info($"Heavy Attack Action Triggered. Stamina: {CurrentStamina}");
+                    // TODO: Trigger animation, deal damage, etc.
+                }
+                else
+                {
+                    Log.Info($"Heavy Attack failed. Insufficient stamina: {CurrentStamina}/{HeavyAttackStaminaCost}");
+                }
+            }
+
+            // Handle Dodge
+            if (dodgeReceiver.TryReceive())
+            {
+                if (CurrentStamina >= DodgeStaminaCost)
+                {
+                    CurrentStamina -= DodgeStaminaCost;
+                    isRegeneratingStamina = false;
+                    Log.Info($"Dodge Action Triggered. Stamina: {CurrentStamina}");
+                    // TODO: Perform dodge movement, trigger animation
+                }
+                else
+                {
+                    Log.Info($"Dodge failed. Insufficient stamina: {CurrentStamina}/{DodgeStaminaCost}");
+                }
+            }
+
 
             // Handle Melee Mode Toggle
             if (toggleMeleeModeReceiver.TryReceive())
@@ -134,6 +273,16 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
             bool hasMovementInput = moveDirectionEvent.TryReceive(out receivedMoveDirection);
 
             Move(receivedMoveDirection, hasMovementInput);
+
+            // Stamina Regeneration
+            if (isRegeneratingStamina && CurrentStamina < MaxStamina)
+            {
+                CurrentStamina += StaminaRegenRate * deltaTime;
+                if (CurrentStamina > MaxStamina)
+                {
+                    CurrentStamina = MaxStamina;
+                }
+            }
         }
 
         private void OnJumpRequested()
@@ -314,7 +463,14 @@ namespace MySurvivalGame.Game // MODIFIED: Namespace updated
                     // We want the player to move, but keep facing target.
                     // The movement direction should be relative to camera's yaw, but player faces target.
                     // Get camera's current yaw rotation
-                    var cameraEntity = SceneSystem.Default.GraphicsCompositor.Cameras[0].SceneCamera.Entity; // Brittle way to get camera
+                    var cameraEntity = PlayerCameraEntity ?? SceneSystem.Default.GraphicsCompositor.Cameras.FirstOrDefault()?.SceneCamera.Entity;
+                    if (cameraEntity == null)
+                    {
+                        // Fallback or log error if no camera found
+                        Log.Error("No camera entity found for locked-on movement calculation.");
+                        DefaultMovement(inputMoveDirection, hasMovementInput); // Fallback to default
+                        return;
+                    }
                     // A better way: pass camera reference or get it from PlayerCamera script later.
                     // For now, let's assume a simplified strafing based on the input vector's components if it was local.
                     // This needs the original local input vector before camera transformation.

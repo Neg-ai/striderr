@@ -26,6 +26,13 @@ namespace MySurvivalGame.Game.Items
         public int CurrentAmmoInClip_Persisted { get; set; } = 0; // Ammo in clip when unequipped
         public int ReserveAmmo_Persisted { get; set; } = 0;     // Reserve ammo when unequipped
         public string RequiredAmmoName { get; set; } = string.Empty; // ADDED: E.g., "Arrow", "9mm Bullet"
+        public float ProjectileSpeed { get; set; } = 0f; // ADDED: For weapons that fire projectiles
+
+        // Properties for throwables/explosives
+        public float FuseTime { get; set; } = 3.0f;
+        public float ThrowForce { get; set; } = 15.0f;
+        public float ExplosionDamage { get; set; } = 100f;
+        public float AoeRadius { get; set; } = 5.0f;
 
         // Constructor
         public WeaponToolData(
@@ -46,10 +53,18 @@ namespace MySurvivalGame.Game.Items
             int clipSize = 0, 
             int currentAmmoInClipPersisted = 0, 
             int reserveAmmoPersisted = 0,
-            string requiredAmmoName = "" // ADDED: Constructor parameter
-        ) : base(name, itemType, description, icon, quantity, (initialDurability ?? maxDurability) / maxDurability, maxStackSize, equipmentType) 
+            string requiredAmmoName = "",
+            float weight = 0.1f,
+            float projectileSpeed = 0f,
+            // Throwable/Explosive specific parameters
+            bool isThrowable = false, // Passed to base MockInventoryItem
+            float fuseTime = 3.0f,
+            float throwForce = 15.0f,
+            float explosionDamage = 0f, // Default to 0 if not explosive
+            float aoeRadius = 0f      // Default to 0 if not explosive
+        ) : base(name, itemType, description, icon, quantity, (initialDurability ?? maxDurability) / maxDurability, maxStackSize, equipmentType, weight, isThrowable)
         {
-            Damage = damage;
+            Damage = damage; // For direct hit damage if applicable, or base for explosion if not overridden
             FireRate = fireRate;
             Range = range;
             BonusType = bonusType;
@@ -61,7 +76,17 @@ namespace MySurvivalGame.Game.Items
                 this.ClipSize = clipSize; 
                 this.CurrentAmmoInClip_Persisted = currentAmmoInClipPersisted; 
                 this.ReserveAmmo_Persisted = reserveAmmoPersisted; 
-                this.RequiredAmmoName = requiredAmmoName; // ADDED: Assign to property
+                this.RequiredAmmoName = requiredAmmoName;
+                this.ProjectileSpeed = projectileSpeed;
+            }
+
+            // Assign throwable/explosive specific properties
+            if (isThrowable || equipmentType == EquipmentType.Deployable) // Consider Deployable as potentially explosive too
+            {
+                this.FuseTime = fuseTime;
+                this.ThrowForce = throwForce;
+                this.ExplosionDamage = explosionDamage;
+                this.AoeRadius = aoeRadius;
             }
             
             UpdateBaseDurability();

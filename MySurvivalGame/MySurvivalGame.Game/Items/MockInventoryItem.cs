@@ -31,6 +31,8 @@ namespace MySurvivalGame.Game.Items // MODIFIED: Namespace updated
         public int MaxStackSize { get; set; }
         public EquipmentType CurrentEquipmentType { get; set; }
         public bool IsStackable => MaxStackSize > 1;
+        public float Weight { get; set; } = 0.1f; // Default to a small value
+        public bool IsThrowable { get; set; } = false; // ADDED: For throwable items
 
         // Constructor updated for new properties
         public MockInventoryItem(string name, 
@@ -40,7 +42,9 @@ namespace MySurvivalGame.Game.Items // MODIFIED: Namespace updated
                                  int quantity = 1, 
                                  float? durability = null, 
                                  int maxStackSize = 1, 
-                                 EquipmentType equipmentType = EquipmentType.None)
+                                 EquipmentType equipmentType = EquipmentType.None,
+                                 float weight = 0.1f,
+                                 bool isThrowable = false) // ADDED: isThrowable parameter
         {
             Name = name;
             ItemType = itemType;
@@ -53,6 +57,8 @@ namespace MySurvivalGame.Game.Items // MODIFIED: Namespace updated
             UniqueId = Guid.NewGuid();
             MaxStackSize = maxStackSize;
             CurrentEquipmentType = equipmentType;
+            Weight = weight;
+            IsThrowable = isThrowable; // ADDED: Assign to property
         }
     }
 }
